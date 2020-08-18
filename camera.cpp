@@ -22,6 +22,10 @@ inline camera CameraCreate_(v3 Pos, v3 View, v3 Up, v3 Right, f32 AspectRatio, f
     Result.Up = Up;
     Result.Right = Right;
 
+    Result.GpuBuffer = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
+                                      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                      sizeof(camera_input));
+
     return Result;
 }
 

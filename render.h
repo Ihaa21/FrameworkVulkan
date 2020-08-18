@@ -1,5 +1,112 @@
 #pragma once
 
+#define VK_EXPORTED_FUNC(func) PFN_##func func;
+#define VK_GLOBAL_LEVEL_FUNC(func) PFN_##func func;
+#define VK_INSTANCE_LEVEL_FUNC(func) PFN_##func func;
+#define VK_DEVICE_LEVEL_FUNC(func) PFN_##func func;
+
+#define VULKAN_FUNC_LIST                                                \
+    VK_EXPORTED_FUNC(       vkGetInstanceProcAddr);                     \
+    VK_GLOBAL_LEVEL_FUNC(   vkCreateInstance);                          \
+    VK_GLOBAL_LEVEL_FUNC(   vkEnumerateInstanceExtensionProperties);    \
+    VK_GLOBAL_LEVEL_FUNC(   vkEnumerateInstanceLayerProperties);        \
+    VK_INSTANCE_LEVEL_FUNC( vkDestroyInstance );                        \
+    VK_INSTANCE_LEVEL_FUNC( vkEnumeratePhysicalDevices );               \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceProperties );            \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceFeatures );              \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceQueueFamilyProperties ); \
+    VK_INSTANCE_LEVEL_FUNC( vkCreateDevice );                           \
+    VK_INSTANCE_LEVEL_FUNC( vkGetDeviceProcAddr );                      \
+    VK_INSTANCE_LEVEL_FUNC( vkEnumerateDeviceExtensionProperties );     \
+    VK_INSTANCE_LEVEL_FUNC( vkDestroySurfaceKHR );                      \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceSurfaceSupportKHR );     \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceSurfaceCapabilitiesKHR ); \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceSurfaceFormatsKHR );     \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceSurfacePresentModesKHR ); \
+    VK_INSTANCE_LEVEL_FUNC( vkCreateWin32SurfaceKHR );                  \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceMemoryProperties );      \
+    VK_INSTANCE_LEVEL_FUNC( vkGetPhysicalDeviceFormatProperties );      \
+    VK_DEVICE_LEVEL_FUNC(   vkGetDeviceQueue );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyDevice );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkDeviceWaitIdle );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkQueueWaitIdle );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateSwapchainKHR );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroySwapchainKHR );                    \
+    VK_DEVICE_LEVEL_FUNC(   vkGetSwapchainImagesKHR );                  \
+    VK_DEVICE_LEVEL_FUNC(   vkAcquireNextImageKHR );                    \
+    VK_DEVICE_LEVEL_FUNC(   vkQueuePresentKHR );                        \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateSemaphore );                        \
+    VK_DEVICE_LEVEL_FUNC(   vkQueueSubmit );                            \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateCommandPool );                      \
+    VK_DEVICE_LEVEL_FUNC(   vkAllocateCommandBuffers );                 \
+    VK_DEVICE_LEVEL_FUNC(   vkBeginCommandBuffer );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdPipelineBarrier );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdClearColorImage );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkEndCommandBuffer );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateImageView );                        \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateRenderPass );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateFramebuffer );                      \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateShaderModule );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCreatePipelineLayout );                   \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateGraphicsPipelines );                \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdBeginRenderPass );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdBindPipeline );                        \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdDraw );                                \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdEndRenderPass );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateFence );                            \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateBuffer );                           \
+    VK_DEVICE_LEVEL_FUNC(   vkGetBufferMemoryRequirements );            \
+    VK_DEVICE_LEVEL_FUNC(   vkAllocateMemory );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkBindBufferMemory );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkMapMemory );                              \
+    VK_DEVICE_LEVEL_FUNC(   vkFlushMappedMemoryRanges );                \
+    VK_DEVICE_LEVEL_FUNC(   vkUnmapMemory );                            \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdSetViewport );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdSetScissor );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdBindVertexBuffers );                   \
+    VK_DEVICE_LEVEL_FUNC(   vkWaitForFences );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkResetFences );                            \
+    VK_DEVICE_LEVEL_FUNC(   vkFreeMemory );                             \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyBuffer );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyFence );                           \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyFramebuffer );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdCopyBuffer );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateImage );                            \
+    VK_DEVICE_LEVEL_FUNC(   vkGetImageMemoryRequirements );             \
+    VK_DEVICE_LEVEL_FUNC(   vkBindImageMemory );                        \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateSampler );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdCopyBufferToImage );                   \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateDescriptorSetLayout );              \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateDescriptorPool );                   \
+    VK_DEVICE_LEVEL_FUNC(   vkAllocateDescriptorSets );                 \
+    VK_DEVICE_LEVEL_FUNC(   vkUpdateDescriptorSets );                   \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdBindDescriptorSets );                  \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyDescriptorPool );                  \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyDescriptorSetLayout );             \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroySampler );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyImage );                           \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdNextSubpass );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkFreeCommandBuffers );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdExecuteCommands );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateComputePipelines );                 \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdDispatch );                            \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdFillBuffer );                          \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdPushConstants );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyShaderModule );                    \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateBufferView );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdBindIndexBuffer );                     \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdDrawIndexed );                         \
+
+
+VULKAN_FUNC_LIST;
+
+#undef VK_EXPORTED_FUNC
+#undef VK_GLOBAL_LEVEL_FUNC
+#undef VK_INSTANCE_LEVEL_FUNC
+#undef VK_DEVICE_LEVEL_FUNC
+
+#include "graphics_utils\vulkan\vulkan_utils.h"
+
 struct render_mesh
 {
     u32 VertexOffset;
@@ -143,3 +250,5 @@ struct render_state
     // NOTE: Fullscreen Pass
     VkBuffer FullScreenVbo;
 };
+
+global render_state* RenderState;

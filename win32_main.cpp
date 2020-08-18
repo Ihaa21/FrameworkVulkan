@@ -264,15 +264,22 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
                 {
                     InvalidCodePath;
                 }
-                
-                RECT WindowRect;
-                GetClientRect(GlobalState.WindowHandle, &WindowRect);
 
-                CurrInput.MousePixelPos.x = Win32MousePos.x - WindowRect.left;
-                CurrInput.MousePixelPos.y = Win32MousePos.y - WindowRect.bottom;
+                // NOTE: Transform coords to be in window (multi monitor setup)
+                {
+                    RECT WindowRect;
+                    GetWindowRect(GlobalState.WindowHandle, &WindowRect);
+                    CurrInput.MousePixelPos.x = Win32MousePos.x - WindowRect.left;
+                    CurrInput.MousePixelPos.y = Win32MousePos.y - WindowRect.top;
+                }
+
+                // NOTE: Transform coords to be in the client (not including window GUI)
+                RECT ClientRect;
+                GetClientRect(GlobalState.WindowHandle, &ClientRect);
+                CurrInput.MousePixelPos = CurrInput.MousePixelPos - V2i(ClientRect.left, ClientRect.top);
                 
-                CurrInput.MouseNormalizedPos.x = (f32)(CurrInput.MousePixelPos.x) / (f32)(WindowRect.right - WindowRect.left);
-                CurrInput.MouseNormalizedPos.y = (f32)(CurrInput.MousePixelPos.y) / (f32)(WindowRect.top - WindowRect.bottom);
+                CurrInput.MouseNormalizedPos.x = (f32)(CurrInput.MousePixelPos.x) / (f32)(ClientRect.right - ClientRect.left);
+                CurrInput.MouseNormalizedPos.y = (f32)(CurrInput.MousePixelPos.y) / (f32)(ClientRect.top - ClientRect.bottom);
                 CurrInput.MouseNormalizedPos.x = Max(0.0f, Min(1.0f, CurrInput.MouseNormalizedPos.x));
                 CurrInput.MouseNormalizedPos.y = Max(0.0f, Min(1.0f, CurrInput.MouseNormalizedPos.y));
 

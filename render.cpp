@@ -156,7 +156,8 @@ inline render_fullscreen_pass FullScreenPassCreate(char* FragmentShader, char* M
         vk_pipeline_builder Builder = VkPipelineBuilderBegin(&RenderState->CpuArena);
         
         // NOTE: Shaders
-        VkPipelineVertexShaderAdd(&Builder, "fullscreen_pass.spv", "main");
+        // TODO: Use a custom build file for the win32 exe and for getting the prebuilt shaders to where we need them
+        VkPipelineVertexShaderAdd(&Builder, "C:\\Code\\Libs\\framework_vulkan\\fullscreen_pass.spv", "main");
         VkPipelineFragmentShaderAdd(&Builder, FragmentShader, MainFuncName);
                 
         // NOTE: Specify input vertex data format
@@ -471,7 +472,7 @@ inline void VkGetDeviceFunctionPointers()
 }
 
 inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, linear_arena* Arena, linear_arena* TempArena,
-                   u32 WindowWidth, u32 WindowHeight)
+                   u32 WindowWidth, u32 WindowHeight, u32 StagingBufferSize)
 {
     temp_mem TempMem = BeginTempMem(TempArena);
 
@@ -758,7 +759,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
     RenderState->DescriptorManager = VkDescriptorManagerCreate(&RenderState->CpuArena, 100);
     RenderState->TransferManager = VkTransferManagerCreate(RenderState->Device, RenderState->StagingMemoryId, &RenderState->CpuArena,
                                                           &RenderState->GpuArena, u32(RenderState->DeviceLimits.nonCoherentAtomSize),
-                                                          STAGING_BUFFER_SIZE, 100, 100);
+                                                          StagingBufferSize, 100, 100);
     RenderState->PipelineManager = VkPipelineManagerCreate(&RenderState->CpuArena);
     
     // NOTE: Init memory for swap chain images

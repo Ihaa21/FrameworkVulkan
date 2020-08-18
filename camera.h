@@ -52,6 +52,8 @@ struct camera
     {
         fps_camera FpsCamera;
     };
+
+    VkBuffer GpuBuffer;
 };
 
 struct camera_input
