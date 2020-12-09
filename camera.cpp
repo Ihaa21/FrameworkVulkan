@@ -15,7 +15,7 @@ inline camera CameraCreate_(v3 Pos, v3 View, v3 Up, v3 Right, f32 AspectRatio, f
     Result.AspectRatio = AspectRatio;
     Result.Near = Near;
     Result.Far = Far;
-    Result.Fov = DegreeToRad(Fov);
+    Result.Fov = DegreeToRadians(Fov);
     
     Result.Pos = Pos;
     Result.View = View;
@@ -42,11 +42,23 @@ inline camera CameraFpsCreate(v3 Pos, v3 View, f32 AspectRatio, f32 Near, f32 Fa
     return Result;
 }
 
+inline m4 CameraGetP(camera* Camera)
+{
+    m4 Result = VkPerspProjM4(Camera->AspectRatio, Camera->Fov, Camera->Near, Camera->Far);
+    return Result;
+}
+
+inline m4 CameraGetV(camera* Camera)
+{
+    m4 Result = LookAtM4(Camera->View, Camera->Up, Camera->Pos);
+    return Result;
+}
+
 inline m4 CameraGetVP(camera* Camera)
 {
     m4 Result = {};
-    m4 VTransform = LookAtM4(Camera->View, Camera->Up, Camera->Pos);
-    m4 PTransform = VkPerspProjM4(Camera->AspectRatio, Camera->Fov, Camera->Near, Camera->Far);
+    m4 VTransform = CameraGetV(Camera);
+    m4 PTransform = CameraGetP(Camera);
 
     Result = PTransform*VTransform;
 
@@ -60,8 +72,8 @@ inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* Pr
     v3 NewRight = Camera->Right;
     if (CurrInput->MouseDown)
     {
-        f32 Head = -(f32)(CurrInput->MouseNormalizedPos.x - PrevInput->MouseNormalizedPos.x);
-        f32 Pitch = -(f32)(CurrInput->MouseNormalizedPos.y - PrevInput->MouseNormalizedPos.y);
+        f32 Head = (f32)(CurrInput->MouseNormalizedPos.x - PrevInput->MouseNormalizedPos.x);
+        f32 Pitch = (f32)(CurrInput->MouseNormalizedPos.y - PrevInput->MouseNormalizedPos.y);
 
         // TODO: Generate quaternion here
         // NOTE: Rotate about the up vector and right vector

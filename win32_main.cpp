@@ -9,10 +9,6 @@
 #include "platform.h"
 #include "win32_main.h"
 
-// TODO: REMOVE
-#include "parser.h"
-#include "parser.cpp"
-
 global prog_state GlobalState;
 
 inline LARGE_INTEGER Win32GetClock()
@@ -23,6 +19,7 @@ inline LARGE_INTEGER Win32GetClock()
     return Result;
 }
 
+// TODO: This should be a F64??
 inline f32 Win32GetSecondsBetween(LARGE_INTEGER End, LARGE_INTEGER Start)
 {
     f32 Result = ((f32)(End.QuadPart - Start.QuadPart) / (f32)GlobalState.TimerFrequency);
@@ -75,6 +72,7 @@ inline void Win32LoadDemoCode(prog_demo_code* DemoCode)
 
             // NOTE: Load in the functions from our DLL
             DemoCode->Init = (demo_init*)GetProcAddress(DemoCode->DLL, "Init");
+            DemoCode->Destroy = (demo_destroy*)GetProcAddress(DemoCode->DLL, "Destroy");
             DemoCode->CodeReload = (demo_code_reload*)GetProcAddress(DemoCode->DLL, "CodeReload");
             DemoCode->MainLoop = (demo_main_loop*)GetProcAddress(DemoCode->DLL, "MainLoop");
             
@@ -192,6 +190,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
             InvalidCodePath;
         }
 
+        
+        
         GlobalState.DemoCode.Init(GlobalState.ProgramMemory, GlobalState.ProgramMemorySize, VulkanLib, hInstance, WindowWidth, WindowHeight,
                                   GlobalState.WindowHandle);
     }
@@ -260,35 +260,34 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
             {
                 // TODO: Values don't make sense on second monitor
                 POINT Win32MousePos;
-                if (!GetCursorPos(&Win32MousePos))
-                {
-                    InvalidCodePath;
-                }
+                Assert(GetCursorPos(&Win32MousePos));
+                Assert(ScreenToClient(GlobalState.WindowHandle, &Win32MousePos));
+                CurrInput.MousePixelPos = V2i(Win32MousePos.x, Win32MousePos.y);
 
-                // NOTE: Transform coords to be in window (multi monitor setup)
-                {
-                    RECT WindowRect;
-                    GetWindowRect(GlobalState.WindowHandle, &WindowRect);
-                    CurrInput.MousePixelPos.x = Win32MousePos.x - WindowRect.left;
-                    CurrInput.MousePixelPos.y = Win32MousePos.y - WindowRect.top;
-                }
-
-                // NOTE: Transform coords to be in the client (not including window GUI)
                 RECT ClientRect;
                 GetClientRect(GlobalState.WindowHandle, &ClientRect);
-                CurrInput.MousePixelPos = CurrInput.MousePixelPos - V2i(ClientRect.left, ClientRect.top);
-                
-                CurrInput.MouseNormalizedPos.x = (f32)(CurrInput.MousePixelPos.x) / (f32)(ClientRect.right - ClientRect.left);
-                CurrInput.MouseNormalizedPos.y = (f32)(CurrInput.MousePixelPos.y) / (f32)(ClientRect.top - ClientRect.bottom);
-                CurrInput.MouseNormalizedPos.x = Max(0.0f, Min(1.0f, CurrInput.MouseNormalizedPos.x));
-                CurrInput.MouseNormalizedPos.y = Max(0.0f, Min(1.0f, CurrInput.MouseNormalizedPos.y));
 
+                // NOTE: Make the origin be the bottom left corner
+                CurrInput.MousePixelPos.y = ClientRect.bottom - CurrInput.MousePixelPos.y;
+                
+                CurrInput.MouseNormalizedPos.x = f32(CurrInput.MousePixelPos.x) / (f32)(ClientRect.right - ClientRect.left);
+                CurrInput.MouseNormalizedPos.y = f32(CurrInput.MousePixelPos.y) / (f32)(ClientRect.top - ClientRect.bottom);
+                
                 CurrInput.MouseDown = (GetKeyState(VK_LBUTTON) & 0x80) != 0;
+
+                /*
+                DebugPrintLog("Mouse: %i, %i, %i, %i, %f, %f\n",
+                              Win32MousePos.x, Win32MousePos.y,
+                              CurrInput.MousePixelPos.x, CurrInput.MousePixelPos.y,
+                              CurrInput.MouseNormalizedPos.x, CurrInput.MouseNormalizedPos.y);
+                */
             }
         }
 
         GlobalState.DemoCode.MainLoop(&PrevInput, &CurrInput, 1.0f / 60.0f);
     }
+
+    GlobalState.DemoCode.Destroy();
     
     return 0;
 }

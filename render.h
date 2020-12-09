@@ -96,6 +96,11 @@
     VK_DEVICE_LEVEL_FUNC(   vkCreateBufferView );                       \
     VK_DEVICE_LEVEL_FUNC(   vkCmdBindIndexBuffer );                     \
     VK_DEVICE_LEVEL_FUNC(   vkCmdDrawIndexed );                         \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyImageView );                       \
+    VK_DEVICE_LEVEL_FUNC(   vkCreateQueryPool );                        \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdResetQueryPool );                      \
+    VK_DEVICE_LEVEL_FUNC(   vkGetQueryPoolResults );                    \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdWriteTimestamp );                      \
 
 
 VULKAN_FUNC_LIST;
@@ -107,6 +112,7 @@ VULKAN_FUNC_LIST;
 
 #include "graphics_utils\vulkan\vulkan_utils.h"
 
+#if 0
 struct render_mesh
 {
     u32 VertexOffset;
@@ -128,6 +134,7 @@ struct render_model
     u32 NumTextures;
     VkImage* TextureArray;
 };
+#endif
 
 //
 // NOTE: Render Target
@@ -195,6 +202,34 @@ struct render_fullscreen_pass
     vk_pipeline* Pipeline;
     u32 NumDescriptorSets;
     VkDescriptorSet* DescriptorSets;
+};
+
+//
+// NOTE: Vk Init
+//
+
+struct render_init_params
+{
+    b32 ValidationEnabled;
+    
+    u32 WindowWidth;
+    u32 WindowHeight;
+    VkPresentModeKHR PresentMode;
+    
+    u32 StagingBufferSize;
+
+    u32 InstanceExtensionCount;
+    const char** InstanceExtensions;
+
+    u32 LayerCount;
+    const char** Layers;
+    
+    u32 DeviceExtensionCount;
+    const char** DeviceExtensions;
+
+    // NOTE: Features to enable
+    VkPhysicalDeviceFeatures EnableFeatures;
+    VkPhysicalDeviceFeatures DisableFeatures;
 };
 
 struct render_state

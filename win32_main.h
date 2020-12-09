@@ -12,6 +12,7 @@ struct prog_demo_code
     FILETIME LastDLLFileTime;
 
     demo_init* Init;
+    demo_destroy* Destroy;
     demo_code_reload* CodeReload;
     demo_main_loop* MainLoop;
 };

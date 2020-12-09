@@ -65,7 +65,7 @@ inline render_target RenderTargetBuilderEnd(render_target_builder* Builder, VkRe
     Result.Entries = PushArray(Builder->Arena, render_target_entry*, Result.NumEntries);
     CopyArray(Builder->Entries, Result.Entries, render_target_entry*, Result.NumEntries);
     Result.ClearValues = PushArray(Builder->Arena, VkClearValue, Result.NumEntries);
-    CopyArray(Builder->Entries, Result.Entries, VkClearValue, Result.NumEntries);
+    CopyArray(Builder->ClearValues, Result.ClearValues, VkClearValue, Result.NumEntries);
 
     Result.RenderPass = RenderPass;
     if (!Builder->HasSwapChain)
@@ -88,7 +88,8 @@ inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* Re
     {
         Views[ViewId] = RenderTarget->Entries[ViewId]->View;
     }
-    
+
+    // TODO: We only want to recreate fbo's if they are swapchain I believe
     VkFboReCreate(RenderState->Device, RenderTarget->RenderPass, Views, RenderTarget->NumEntries, &RenderTarget->FrameBuffer,
                   RenderTarget->Width, RenderTarget->Height);
 
@@ -129,6 +130,11 @@ inline void RenderTargetRenderPassBegin(render_target* RenderTarget, vk_commands
     }
 }
 
+inline void RenderTargetNextSubPass(vk_commands Commands)
+{
+    vkCmdNextSubpass(Commands.Buffer, VK_SUBPASS_CONTENTS_INLINE);
+}
+
 inline void RenderTargetRenderPassEnd(vk_commands Commands)
 {
     vkCmdEndRenderPass(Commands.Buffer);
@@ -157,8 +163,8 @@ inline render_fullscreen_pass FullScreenPassCreate(char* FragmentShader, char* M
         
         // NOTE: Shaders
         // TODO: Use a custom build file for the win32 exe and for getting the prebuilt shaders to where we need them
-        VkPipelineVertexShaderAdd(&Builder, "C:\\Code\\Libs\\framework_vulkan\\fullscreen_pass.spv", "main");
-        VkPipelineFragmentShaderAdd(&Builder, FragmentShader, MainFuncName);
+        VkPipelineShaderAdd(&Builder, "D:\\Code\\Libs\\framework_vulkan\\fullscreen_pass.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
+        VkPipelineShaderAdd(&Builder, FragmentShader, MainFuncName, VK_SHADER_STAGE_FRAGMENT_BIT);
                 
         // NOTE: Specify input vertex data format
         VkPipelineVertexBindingBegin(&Builder);
@@ -199,7 +205,7 @@ inline void FullScreenPassRender(vk_commands Commands, render_fullscreen_pass* P
 // NOTE: Vulkan Init
 //
 
-inline void VkSwapChainReCreate(linear_arena* TempArena, u32 WindowWidth, u32 WindowHeight)
+inline void VkSwapChainReCreate(linear_arena* TempArena, u32 WindowWidth, u32 WindowHeight, VkPresentModeKHR InPresentMode)
 {
     temp_mem TempMem = BeginTempMem(TempArena);
     
@@ -310,24 +316,12 @@ inline void VkSwapChainReCreate(linear_arena* TempArena, u32 WindowWidth, u32 Wi
         VkPresentModeKHR PresentMode = {};
         for (u32 PresentationId = 0; PresentationId < PresentModesCount; ++PresentationId)
         {
-            if (PresentModes[PresentationId] == VK_PRESENT_MODE_MAILBOX_KHR)
+            if (PresentModes[PresentationId] == InPresentMode)
             {
                 PresentMode = PresentModes[PresentationId];
             }
         }
-
-        if (PresentMode != VK_PRESENT_MODE_MAILBOX_KHR)
-        {
-            for (u32 PresentationId = 0; PresentationId < PresentModesCount; ++PresentationId)
-            {
-                if (PresentModes[PresentationId] == VK_PRESENT_MODE_FIFO_KHR)
-                {
-                    PresentMode = PresentModes[PresentationId];
-                }
-            }
-
-            Assert(PresentMode == VK_PRESENT_MODE_FIFO_KHR);
-        }
+        Assert(PresentMode == InPresentMode);
 
         // NOTE: Finally create the swap chain
         VkSwapchainKHR OldSwapChain = RenderState->SwapChain;
@@ -472,7 +466,7 @@ inline void VkGetDeviceFunctionPointers()
 }
 
 inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, linear_arena* Arena, linear_arena* TempArena,
-                   u32 WindowWidth, u32 WindowHeight, u32 StagingBufferSize)
+                   render_init_params InitParams)
 {
     temp_mem TempMem = BeginTempMem(TempArena);
 
@@ -485,25 +479,23 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         // NOTE: Create a vulkan instance
         {
             // NOTE: Check if instance extensions supported
-            u32 ExtensionCount = 0;
-            VkCheckResult(vkEnumerateInstanceExtensionProperties(0, &ExtensionCount, 0));
+            u32 GpuExtensionCount = 0;
+            VkCheckResult(vkEnumerateInstanceExtensionProperties(0, &GpuExtensionCount, 0));
+            VkExtensionProperties* GpuInstanceExtensions = PushArray(TempArena, VkExtensionProperties, GpuExtensionCount);
+            VkCheckResult(vkEnumerateInstanceExtensionProperties(0, &GpuExtensionCount, GpuInstanceExtensions));
 
-            VkExtensionProperties* Extensions = PushArray(TempArena, VkExtensionProperties, ExtensionCount);
-            VkCheckResult(vkEnumerateInstanceExtensionProperties(0, &ExtensionCount, Extensions));
-
-            const char* RequiredExtensions[] =
-                {
-                    VK_KHR_SURFACE_EXTENSION_NAME,
-                    VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-                    "VK_EXT_debug_report",
-                };
+            u32 InstanceExtensionCount = 2 + InitParams.InstanceExtensionCount;
+            const char** InstanceExtensions = PushArray(TempArena, const char*, InstanceExtensionCount);
+            Copy(InitParams.InstanceExtensions, InstanceExtensions, InitParams.InstanceExtensionCount*sizeof(*InstanceExtensions));
+            InstanceExtensions[InitParams.InstanceExtensionCount + 0] = VK_KHR_SURFACE_EXTENSION_NAME;
+            InstanceExtensions[InitParams.InstanceExtensionCount + 1] = VK_KHR_WIN32_SURFACE_EXTENSION_NAME;
             
-            for (u32 RequiredId = 0; RequiredId < ArrayCount(RequiredExtensions); ++RequiredId)
+            for (u32 RequiredId = 0; RequiredId < InstanceExtensionCount; ++RequiredId)
             {
                 b32 Found = false;
-                for (u32 ExtensionId = 0; ExtensionId < ExtensionCount; ++ExtensionId)
+                for (u32 ExtensionId = 0; ExtensionId < GpuExtensionCount; ++ExtensionId)
                 {
-                    if (strcmp(RequiredExtensions[RequiredId], Extensions[ExtensionId].extensionName))
+                    if (strcmp(InstanceExtensions[RequiredId], GpuInstanceExtensions[ExtensionId].extensionName))
                     {
                         Found = true;
                         break;
@@ -526,20 +518,23 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
             AppInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
             AppInfo.apiVersion = VK_MAKE_VERSION(1, 1, 0);
 
-            const char* RequiredLayers[] =
-                {
-                    "VK_LAYER_KHRONOS_validation",
-                };
+            u32 LayerCount = InitParams.LayerCount + InitParams.ValidationEnabled ? 1 : 0;
+            const char** Layers = PushArray(TempArena, const char*, LayerCount);
+            Copy(InitParams.Layers, Layers, InitParams.LayerCount*sizeof(*Layers));
+            if (InitParams.ValidationEnabled)
+            {
+                Layers[InitParams.LayerCount + 0] = "VK_LAYER_KHRONOS_validation";
+            }
             
             VkInstanceCreateInfo InstanceCreateInfo = {};
             InstanceCreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
             InstanceCreateInfo.pNext = 0;
             InstanceCreateInfo.flags = 0;
             InstanceCreateInfo.pApplicationInfo = &AppInfo;
-            InstanceCreateInfo.enabledLayerCount = ArrayCount(RequiredLayers);
-            InstanceCreateInfo.ppEnabledLayerNames = RequiredLayers;
-            InstanceCreateInfo.enabledExtensionCount = ArrayCount(RequiredExtensions);
-            InstanceCreateInfo.ppEnabledExtensionNames = RequiredExtensions;
+            InstanceCreateInfo.enabledLayerCount = LayerCount;
+            InstanceCreateInfo.ppEnabledLayerNames = Layers;
+            InstanceCreateInfo.enabledExtensionCount = InstanceExtensionCount;
+            InstanceCreateInfo.ppEnabledExtensionNames = InstanceExtensions;
             VkCheckResult(vkCreateInstance(&InstanceCreateInfo, 0, &RenderState->Instance));
         }
 
@@ -561,6 +556,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         
         // NOTE: Select a physical device for our app
         {
+            VkPhysicalDeviceFeatures SelectedFeatures = {};
             VkPhysicalDevice SelectedPhysicalDevice = VK_NULL_HANDLE;
             u32 NumDevices = 0;
             VkCheckResult(vkEnumeratePhysicalDevices(RenderState->Instance, &NumDevices, 0));
@@ -568,7 +564,12 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
 
             VkPhysicalDevice* PhysicalDevices = PushArray(TempArena, VkPhysicalDevice, NumDevices);
             VkCheckResult(vkEnumeratePhysicalDevices(RenderState->Instance, &NumDevices, PhysicalDevices));
-
+            
+            u32 DeviceExtensionCount = InitParams.DeviceExtensionCount + 1;
+            const char** DeviceExtensions = PushArray(TempArena, const char*, DeviceExtensionCount);
+            Copy(InitParams.DeviceExtensions, DeviceExtensions, InitParams.DeviceExtensionCount*sizeof(*DeviceExtensions));
+            DeviceExtensions[InitParams.DeviceExtensionCount + 0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+            
             RenderState->GraphicsQueueFamId = UINT32_MAX;
             RenderState->PresentQueueFamId = UINT32_MAX;
             for (u32 DeviceId = 0; DeviceId < NumDevices; ++DeviceId)
@@ -576,23 +577,18 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                 VkPhysicalDevice CurrDevice = PhysicalDevices[DeviceId];
 
                 // NOTE: Check if supports extensions we want
-                u32 ExtensionCount = 0;
-                VkCheckResult(vkEnumerateDeviceExtensionProperties(CurrDevice, 0, &ExtensionCount, 0));
+                u32 GpuExtensionCount = 0;
+                VkCheckResult(vkEnumerateDeviceExtensionProperties(CurrDevice, 0, &GpuExtensionCount, 0));
 
-                VkExtensionProperties* Extensions = PushArray(TempArena, VkExtensionProperties, ExtensionCount);
-                VkCheckResult(vkEnumerateDeviceExtensionProperties(CurrDevice, 0, &ExtensionCount, Extensions));
+                VkExtensionProperties* GpuExtensions = PushArray(TempArena, VkExtensionProperties, GpuExtensionCount);
+                VkCheckResult(vkEnumerateDeviceExtensionProperties(CurrDevice, 0, &GpuExtensionCount, GpuExtensions));
 
-                const char* RequiredExtensions[] =
-                    {
-                        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                    };
-
-                for (u32 RequiredId = 0; RequiredId < ArrayCount(RequiredExtensions); ++RequiredId)
+                for (u32 RequiredId = 0; RequiredId < DeviceExtensionCount; ++RequiredId)
                 {
                     b32 Found = false;
-                    for (u32 ExtensionId = 0; ExtensionId < ExtensionCount; ++ExtensionId)
+                    for (u32 ExtensionId = 0; ExtensionId < GpuExtensionCount; ++ExtensionId)
                     {
-                        if (strcmp(RequiredExtensions[RequiredId], Extensions[ExtensionId].extensionName))
+                        if (strcmp(DeviceExtensions[RequiredId], GpuExtensions[ExtensionId].extensionName))
                         {
                             Found = true;
                             break;
@@ -653,6 +649,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                             RenderState->GraphicsQueueFamId = FamilyId;
                             RenderState->PresentQueueFamId = FamilyId;
                             SelectedPhysicalDevice = CurrDevice;
+                            SelectedFeatures = DeviceFeatures;
                         }
                     }
                 }
@@ -671,6 +668,24 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
             
             RenderState->PhysicalDevice = SelectedPhysicalDevice;
 
+            // NOTE: Enable/Disable requested features
+            for (u32 OptionId = 0; OptionId < u32(sizeof(SelectedFeatures) / sizeof(VkBool32)); ++OptionId)
+            {
+                VkBool32* Option = (VkBool32*)&SelectedFeatures + OptionId;
+                VkBool32 EnableOption = ((VkBool32*)&InitParams.EnableFeatures)[OptionId];
+                VkBool32 DisableOption = ((VkBool32*)&InitParams.DisableFeatures)[OptionId];
+                Assert(!(EnableOption == DisableOption && EnableOption == VK_TRUE));
+
+                if (EnableOption == VK_TRUE)
+                {
+                    *Option = VK_TRUE;
+                }
+                else if (DisableOption == VK_TRUE)
+                {
+                    *Option = VK_FALSE;
+                }
+            }
+            
             // NOTE: Create a device
             u32 CurrQueueId = 0;
             f32 QueuePriorities[] = {1.0f};
@@ -696,12 +711,6 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                 QueueCreateInfos[CurrQueueId].pQueuePriorities = QueuePriorities;
                 ++CurrQueueId;
             }
-
-            // NOTE: Add required extensions
-            const char* Extensions[] =
-                {
-                    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                };
             
             VkDeviceCreateInfo DeviceCreateInfo =
                 {
@@ -712,9 +721,9 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                     QueueCreateInfos,
                     0,
                     0,
-                    ArrayCount(Extensions),
-                    Extensions,
-                    0,
+                    DeviceExtensionCount,
+                    DeviceExtensions,
+                    &SelectedFeatures,
                 };
 
             VkCheckResult(vkCreateDevice(SelectedPhysicalDevice, &DeviceCreateInfo, 0, &RenderState->Device));
@@ -759,7 +768,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
     RenderState->DescriptorManager = VkDescriptorManagerCreate(&RenderState->CpuArena, 100);
     RenderState->TransferManager = VkTransferManagerCreate(RenderState->Device, RenderState->StagingMemoryId, &RenderState->CpuArena,
                                                           &RenderState->GpuArena, u32(RenderState->DeviceLimits.nonCoherentAtomSize),
-                                                          StagingBufferSize, 100, 100);
+                                                          InitParams.StagingBufferSize, 100, 100);
     RenderState->PipelineManager = VkPipelineManagerCreate(&RenderState->CpuArena);
     
     // NOTE: Init memory for swap chain images
@@ -767,7 +776,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         RenderState->MaxNumSwapChainImgs = 32;
         RenderState->SwapChainImgs = PushArray(&RenderState->CpuArena, VkImage, RenderState->MaxNumSwapChainImgs);
         RenderState->SwapChainViews = PushArray(&RenderState->CpuArena, VkImageView, RenderState->MaxNumSwapChainImgs);
-        VkSwapChainReCreate(TempArena, WindowWidth, WindowHeight);
+        VkSwapChainReCreate(TempArena, InitParams.WindowWidth, InitParams.WindowHeight, InitParams.PresentMode);
     }
     
     // NOTE: Init command buffer data
@@ -808,9 +817,9 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                                                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                                        sizeof(Vertices));
 
-            f32* Data = VkTransferPushBufferWriteArray(&RenderState->TransferManager, RenderState->FullScreenVbo, f32, ArrayCount(Vertices),
-                                                       1, BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
-                                                       BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
+            f32* Data = VkTransferPushWriteArray(&RenderState->TransferManager, RenderState->FullScreenVbo, f32, ArrayCount(Vertices),
+                                                 BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
+                                                 BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
             Copy(Vertices, Data, sizeof(Vertices));
         }
         

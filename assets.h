@@ -1,5 +1,12 @@
 #pragma once
 
+struct procedural_mesh
+{
+    VkBuffer Vertices;
+    u32 NumIndices;
+    VkBuffer Indices;
+};
+
 struct loader_mesh
 {
     // NOTE: Geometry    

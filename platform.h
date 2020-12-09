@@ -20,6 +20,9 @@ struct frame_input
 #define DEMO_INIT(name) void name(void* ProgramMemory, mm ProgramMemorySize, HMODULE VulkanLib, HINSTANCE hInstance, u32 WindowWidth, u32 WindowHeight, HWND WindowHandle)
 typedef DEMO_INIT(demo_init);
 
+#define DEMO_DESTROY(name) void name()
+typedef DEMO_DESTROY(demo_destroy);
+
 #define DEMO_CODE_RELOAD(name) void name(HMODULE VulkanLib, void* ProgramMemory, mm ProgramMemorySize)
 typedef DEMO_CODE_RELOAD(demo_code_reload);
 
