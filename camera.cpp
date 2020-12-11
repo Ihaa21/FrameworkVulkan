@@ -50,7 +50,7 @@ inline m4 CameraGetP(camera* Camera)
 
 inline m4 CameraGetV(camera* Camera)
 {
-    m4 Result = LookAtM4(Camera->View, Camera->Up, Camera->Pos);
+    m4 Result = LookAtM4(Camera->View, Camera->Up, Camera->Right, Camera->Pos);
     return Result;
 }
 
@@ -75,11 +75,10 @@ inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* Pr
         f32 Head = (f32)(CurrInput->MouseNormalizedPos.x - PrevInput->MouseNormalizedPos.x);
         f32 Pitch = (f32)(CurrInput->MouseNormalizedPos.y - PrevInput->MouseNormalizedPos.y);
 
-        // TODO: Generate quaternion here
         // NOTE: Rotate about the up vector and right vector
-        NewView = RotateVectorAroundAxis(Camera->View, Camera->Up, Head*Camera->FpsCamera.TurningVelocity);
-        NewView = RotateVectorAroundAxis(NewView, Camera->Right, Pitch*Camera->FpsCamera.TurningVelocity);
-
+        NewView = RotateVectorAroundAxis(Camera->View, Camera->Up, -Head*Camera->FpsCamera.TurningVelocity);
+        NewView = RotateVectorAroundAxis(NewView, Camera->Right, -Pitch*Camera->FpsCamera.TurningVelocity);
+        
         // NOTE: Update right vector
         NewRight = Normalize(Cross(Camera->Up, NewView));
     }
@@ -94,12 +93,12 @@ inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* Pr
             
     if (SpeedUp)
     {
-        Camera->FpsCamera.Velocity += 0.1f;
+        Camera->FpsCamera.Velocity *= 1.01f;
     }
     if (SlowDown)
     {
-        Camera->FpsCamera.Velocity -= 0.1f;
-        Camera->FpsCamera.Velocity = Max(Camera->FpsCamera.Velocity, 0.1f);
+        Camera->FpsCamera.Velocity /= 1.01f;
+        Camera->FpsCamera.Velocity = Max(Camera->FpsCamera.Velocity, 0.00001f);
     }
     
     f32 Velocity = Camera->FpsCamera.Velocity;
@@ -127,7 +126,7 @@ inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* Pr
     Camera->View = NewView;
     Camera->Right = NewRight;
     Camera->Up = Normalize(Cross(NewView, NewRight));
-
+    
     Assert(Abs(Dot(Camera->View, Camera->Right)) <= 0.0001f);
     Assert(Abs(Dot(Camera->Right, Camera->Up)) <= 0.0001f);
     Assert(Abs(Dot(Camera->Up, Camera->View)) <= 0.0001f);
