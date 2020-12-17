@@ -182,7 +182,7 @@ inline render_fullscreen_pass FullScreenPassCreate(char* FragmentShader, char* M
         
         // NOTE: Shaders
         // TODO: Use a custom build file for the win32 exe and for getting the prebuilt shaders to where we need them
-        VkPipelineShaderAdd(&Builder, "D:\\Code\\Libs\\framework_vulkan\\fullscreen_pass.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
+        VkPipelineShaderAdd(&Builder, "..\\libs\\framework_vulkan\\fullscreen_pass.spv", "main", VK_SHADER_STAGE_VERTEX_BIT);
         VkPipelineShaderAdd(&Builder, FragmentShader, MainFuncName, VK_SHADER_STAGE_FRAGMENT_BIT);
                 
         // NOTE: Specify input vertex data format

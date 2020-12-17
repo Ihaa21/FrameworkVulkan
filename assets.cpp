@@ -282,6 +282,8 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
           twice in different places. The loader has to aggregate everything then. 
  */
 
+#if 0
+
 // TODO: This is a hack rn, do this better
 #undef internal
 #undef global
@@ -298,8 +300,6 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
 //
 // NOTE: Animation loading functions
 //
-
-#if 0
 
 inline m4 AssimpLoadM4(aiMatrix4x4t<f32> Mat)
 {
