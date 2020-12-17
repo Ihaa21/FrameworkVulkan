@@ -246,6 +246,7 @@ struct render_state
     VkQueue PresentQueue;
 
     // NOTE: Swapchain data
+    VkPresentModeKHR PresentMode;
     VkSurfaceKHR WindowSurface;
     VkSwapchainKHR SwapChain;
     VkFormat SwapChainFormat;
@@ -263,9 +264,9 @@ struct render_state
     u32 StagingMemoryId;
     u32 LocalMemoryId;
     linear_arena CpuArena;
-    vk_gpu_linear_arena HostArena;
+    vk_linear_arena HostArena;
     u32* HostPtr;
-    vk_gpu_linear_arena GpuArena;
+    vk_linear_arena GpuArena;
     
     // NOTE: Global Managers
     vk_barrier_manager BarrierManager;

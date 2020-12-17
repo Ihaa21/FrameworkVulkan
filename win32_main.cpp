@@ -73,6 +73,7 @@ inline void Win32LoadDemoCode(prog_demo_code* DemoCode)
             // NOTE: Load in the functions from our DLL
             DemoCode->Init = (demo_init*)GetProcAddress(DemoCode->DLL, "Init");
             DemoCode->Destroy = (demo_destroy*)GetProcAddress(DemoCode->DLL, "Destroy");
+            DemoCode->SwapChainChange = (demo_swapchain_change*)GetProcAddress(DemoCode->DLL, "SwapChainChange");
             DemoCode->CodeReload = (demo_code_reload*)GetProcAddress(DemoCode->DLL, "CodeReload");
             DemoCode->MainLoop = (demo_main_loop*)GetProcAddress(DemoCode->DLL, "MainLoop");
             
@@ -99,12 +100,12 @@ internal LRESULT CALLBACK Win32MainWindowCallBack(HWND Window, UINT Message, WPA
         case WM_SIZE:
         {
             RECT Rect;
-            Assert(GetWindowRect(Window, &Rect));
-            //if (GlobalState.VkInitialized)
+            Assert(GetClientRect(Window, &Rect));
+            if (GlobalState.VkInitialized)
             {
                 u32 Width = Rect.right - Rect.left;
                 u32 Height = Rect.bottom - Rect.top;
-                //VkSwapChainReCreate(&GlobalState.TempArena, Width, Height);
+                GlobalState.DemoCode.SwapChainChange(Width, Height);
             }
 
         } break;
@@ -169,6 +170,12 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         {
             InvalidCodePath;
         }
+
+        // NOTE: Update render dimensions to match client not window
+        RECT Rect;
+        Assert(GetClientRect(GlobalState.WindowHandle, &Rect));
+        WindowWidth = Rect.right - Rect.left;
+        WindowHeight = Rect.bottom - Rect.top;
         
         GlobalState.DeviceContext = GetDC(GlobalState.WindowHandle);
     }
@@ -189,11 +196,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         {
             InvalidCodePath;
         }
-
-        
         
         GlobalState.DemoCode.Init(GlobalState.ProgramMemory, GlobalState.ProgramMemorySize, VulkanLib, hInstance, WindowWidth, WindowHeight,
                                   GlobalState.WindowHandle);
+        GlobalState.VkInitialized = true;
     }
 
     frame_input PrevInput = {};

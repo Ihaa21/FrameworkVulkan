@@ -23,6 +23,9 @@ typedef DEMO_INIT(demo_init);
 #define DEMO_DESTROY(name) void name()
 typedef DEMO_DESTROY(demo_destroy);
 
+#define DEMO_SWAPCHAIN_CHANGE(name) void name(u32 WindowWidth, u32 WindowHeight)
+typedef DEMO_SWAPCHAIN_CHANGE(demo_swapchain_change);
+
 #define DEMO_CODE_RELOAD(name) void name(HMODULE VulkanLib, void* ProgramMemory, mm ProgramMemorySize)
 typedef DEMO_CODE_RELOAD(demo_code_reload);
 

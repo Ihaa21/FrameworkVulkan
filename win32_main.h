@@ -13,12 +13,15 @@ struct prog_demo_code
 
     demo_init* Init;
     demo_destroy* Destroy;
+    demo_swapchain_change* SwapChainChange;
     demo_code_reload* CodeReload;
     demo_main_loop* MainLoop;
 };
 
 struct prog_state
 {
+    b32 VkInitialized;
+    
     mm ProgramMemorySize;
     void* ProgramMemory;
     

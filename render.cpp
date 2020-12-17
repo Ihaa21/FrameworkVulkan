@@ -3,7 +3,7 @@
 // NOTE: Render Target
 //
 
-inline render_target_entry RenderTargetEntryCreate(vk_gpu_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format,
+inline render_target_entry RenderTargetEntryCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format,
                                                    VkImageUsageFlags Usage, VkImageAspectFlags AspectMask)
 {
     render_target_entry Result = {};
@@ -13,6 +13,23 @@ inline render_target_entry RenderTargetEntryCreate(vk_gpu_linear_arena* Arena, u
     VkImage2dCreate(RenderState->Device, Arena, Width, Height, Format, Usage, AspectMask, &Result.Image, &Result.View);
 
     return Result;
+}
+
+inline void RenderTargetEntryDestroy(render_target_entry Entry)
+{
+    vkDestroyImageView(RenderState->Device, Entry.View, 0);
+    vkDestroyImage(RenderState->Device, Entry.Image, 0);
+}
+
+inline void RenderTargetEntryReCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
+                                      VkImageAspectFlags AspectMask, render_target_entry* OutEntry)
+{
+    Assert((OutEntry->Flags & RenderTargetEntry_SwapChain) == 0);
+    if (OutEntry->Image != VK_NULL_HANDLE)
+    {
+        RenderTargetEntryDestroy(*OutEntry);
+    }
+    *OutEntry = RenderTargetEntryCreate(Arena, Width, Height, Format, Usage, AspectMask);
 }
 
 inline render_target_entry RenderTargetSwapChainEntryCreate(u32 Width, u32 Height, VkFormat Format)
@@ -89,7 +106,9 @@ inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* Re
         Views[ViewId] = RenderTarget->Entries[ViewId]->View;
     }
 
-    // TODO: We only want to recreate fbo's if they are swapchain I believe
+    // NOTE: Update size and recreate FBO
+    RenderTarget->Width = RenderTarget->Entries[0]->Width;
+    RenderTarget->Height = RenderTarget->Entries[0]->Height;
     VkFboReCreate(RenderState->Device, RenderTarget->RenderPass, Views, RenderTarget->NumEntries, &RenderTarget->FrameBuffer,
                   RenderTarget->Width, RenderTarget->Height);
 
@@ -753,14 +772,14 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
     // NOTE: Allocate host memory
     {
         u64 HeapSize = GigaBytes(1);
-        RenderState->HostArena = VkGpuLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->StagingMemoryId, HeapSize), HeapSize);
+        RenderState->HostArena = VkLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->StagingMemoryId, HeapSize), HeapSize);
         VkCheckResult(vkMapMemory(RenderState->Device, RenderState->HostArena.Memory, 0, HeapSize, 0, (void**)&RenderState->HostPtr));
     }
     
     // NOTE: Allocate GPU memory
     {
         u64 HeapSize = GigaBytes(1);
-        RenderState->GpuArena = VkGpuLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->LocalMemoryId, HeapSize), HeapSize);
+        RenderState->GpuArena = VkLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->LocalMemoryId, HeapSize), HeapSize);
     }
 
     // NOTE: Create Managers
@@ -776,6 +795,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         RenderState->MaxNumSwapChainImgs = 32;
         RenderState->SwapChainImgs = PushArray(&RenderState->CpuArena, VkImage, RenderState->MaxNumSwapChainImgs);
         RenderState->SwapChainViews = PushArray(&RenderState->CpuArena, VkImageView, RenderState->MaxNumSwapChainImgs);
+        RenderState->PresentMode = InitParams.PresentMode;
         VkSwapChainReCreate(TempArena, InitParams.WindowWidth, InitParams.WindowHeight, InitParams.PresentMode);
     }
     
