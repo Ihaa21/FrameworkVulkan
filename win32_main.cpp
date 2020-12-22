@@ -263,6 +263,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
             }
 
             // NOTE: Mouse Input
+            if (GetActiveWindow() == GlobalState.WindowHandle)
             {
                 // TODO: Values don't make sense on second monitor
                 POINT Win32MousePos;
@@ -287,6 +288,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
                               CurrInput.MousePixelPos.x, CurrInput.MousePixelPos.y,
                               CurrInput.MouseNormalizedPos.x, CurrInput.MouseNormalizedPos.y);
                 */
+            }
+            else
+            {
+                CurrInput = {};
             }
         }
 

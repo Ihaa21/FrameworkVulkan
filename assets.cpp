@@ -26,16 +26,16 @@ internal vk_image TextureLoad(char* ImagePath, VkFormat Format, b32 FloatType, u
         NumComponents = ForceComponentCount;
     }
     
-    u32 ImageSize = Width*Height*NumComponents*ComponentSize;
     Result = VkImage2dCreate(RenderState->Device, &RenderState->GpuArena, Width, Height, Format,
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     // TODO: Better barrier here pls
-    u8* GpuMemory = VkTransferPushWriteImage(&RenderState->TransferManager, Result.Image, Width, Height, ImageSize,
+    u8* GpuMemory = VkTransferPushWriteImage(&RenderState->TransferManager, Result.Image, Width, Height, ComponentSize*NumComponents, 
                                              VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                              BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                              BarrierMask(VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
 
+    u32 ImageSize = Width*Height*NumComponents*ComponentSize;
     Copy(Pixels, GpuMemory, ImageSize);
     
     // NOTE: Delete file from memory
@@ -97,44 +97,43 @@ inline procedural_mesh AssetsPushCube()
         
     // IMPORTANT: Its assumed this is happening during a transfer operation
     {
-        // TODO: Add normals and UV
         f32 Vertices[] = 
             {
                 // NOTE: Front face
-                -0.5, -0.5, 0.5,
-                0.5, -0.5, 0.5,
-                0.5, 0.5, 0.5,
-                -0.5, 0.5, 0.5,
+                -0.5, -0.5, 0.5, 0, 0, -1, 0, 0,
+                0.5, -0.5, 0.5, 0, 0, -1, 0, 0,
+                0.5, 0.5, 0.5, 0, 0, -1, 0, 0,
+                -0.5, 0.5, 0.5, 0, 0, -1, 0, 0,
 
                 // NOTE: Back face
-                -0.5, -0.5, -0.5,
-                0.5, -0.5, -0.5,
-                0.5, 0.5, -0.5,
-                -0.5, 0.5, -0.5,
+                -0.5, -0.5, -0.5, 0, 0, 1, 0, 0,
+                0.5, -0.5, -0.5, 0, 0, 1, 0, 0,
+                0.5, 0.5, -0.5, 0, 0, 1, 0, 0,
+                -0.5, 0.5, -0.5, 0, 0, 1, 0, 0,
 
                 // NOTE: Left face
-                -0.5, -0.5, -0.5,
-                -0.5, 0.5, -0.5,
-                -0.5, 0.5, 0.5,
-                -0.5, -0.5, 0.5,
+                -0.5, -0.5, -0.5, -1, 0, 0, 0, 0,
+                -0.5, 0.5, -0.5, -1, 0, 0, 0, 0,
+                -0.5, 0.5, 0.5, -1, 0, 0, 0, 0,
+                -0.5, -0.5, 0.5, -1, 0, 0, 0, 0,
 
                 // NOTE: Right face
-                0.5, -0.5, -0.5,
-                0.5, 0.5, -0.5,
-                0.5, 0.5, 0.5,
-                0.5, -0.5, 0.5,
+                0.5, -0.5, -0.5, 1, 0, 0, 0, 0,
+                0.5, 0.5, -0.5, 1, 0, 0, 0, 0,
+                0.5, 0.5, 0.5, 1, 0, 0, 0, 0,
+                0.5, -0.5, 0.5, 1, 0, 0, 0, 0,
 
                 // NOTE: Top face
-                -0.5, 0.5, -0.5,
-                0.5, 0.5, -0.5,
-                0.5, 0.5, 0.5,
-                -0.5, 0.5, 0.5,
+                -0.5, 0.5, -0.5, 0, 1, 0, 0, 0,
+                0.5, 0.5, -0.5, 0, 1, 0, 0, 0,
+                0.5, 0.5, 0.5, 0, 1, 0, 0, 0,
+                -0.5, 0.5, 0.5, 0, 1, 0, 0, 0,
 
                 // NOTE: Bottom face
-                -0.5, -0.5, -0.5,
-                0.5, -0.5, -0.5,
-                0.5, -0.5, 0.5,
-                -0.5, -0.5, 0.5,
+                -0.5, -0.5, -0.5, 0, -1, 0, 0, 0,
+                0.5, -0.5, -0.5, 0, -1, 0, 0, 0,
+                0.5, -0.5, 0.5, 0, -1, 0, 0, 0,
+                -0.5, -0.5, 0.5, 0, -1, 0, 0, 0,
             };
 
         Result.Vertices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
@@ -225,7 +224,7 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
         }
     }
 
-    Result.NumIndices = 2*NumYSegments*(NumXSegments + 1);
+    Result.NumIndices = NumYSegments*(NumXSegments + 1)*6;
     Result.Indices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                     Result.NumIndices*sizeof(u32));
@@ -233,28 +232,19 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
                                             BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                             BarrierMask(VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
 
-    b32 OddRow = false;
     u32* CurrIndex = Indices;
     for (i32 Y = 0; Y < NumYSegments; ++Y)
     {
-        if (!OddRow)
+        for (i32 X = 0; X <= NumXSegments; ++X)
         {
-            for (i32 X = 0; X <= NumXSegments; ++X)
-            {
-                *CurrIndex++ = Y * (NumXSegments + 1) + X;
-                *CurrIndex++ = (Y+1) * (NumXSegments + 1) + X;
-            }
-        }
-        else
-        {
-            for (i32 X = NumXSegments; X >= 0; --X)
-            {
-                *CurrIndex++ = (Y+1) * (NumXSegments + 1) + X;
-                *CurrIndex++ = Y * (NumXSegments + 1) + X;
-            }
-        }
+            *CurrIndex++ = (Y+1)*(NumXSegments + 1) + X;
+            *CurrIndex++ = (Y+1)*(NumXSegments + 1) + X+1;
+            *CurrIndex++ = (Y)*(NumXSegments + 1) + X+1;
 
-        OddRow = !OddRow;
+            *CurrIndex++ = (Y)*(NumXSegments + 1) + X+1;
+            *CurrIndex++ = (Y)*(NumXSegments + 1) + X;
+            *CurrIndex++ = (Y+1)*(NumXSegments + 1) + X;
+        }
     }
 
     return Result;
