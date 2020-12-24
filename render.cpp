@@ -46,19 +46,17 @@ inline void RenderTargetEntryDestroy(render_target_entry Entry)
     vkDestroyImageView(RenderState->Device, Entry.View, 0);
 }
 
-// TODO: FIX
-#if 0
 inline void RenderTargetEntryReCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
-                                      VkImageAspectFlags AspectMask, render_target_entry* OutEntry)
+                                      VkImageAspectFlags AspectMask, VkImage* OutImage, render_target_entry* OutEntry)
 {
     Assert((OutEntry->Flags & RenderTargetEntry_SwapChain) == 0);
     if (OutEntry->View != VK_NULL_HANDLE)
     {
+        vkDestroyImage(RenderState->Device, *OutImage, 0);
         RenderTargetEntryDestroy(*OutEntry);
     }
-    *OutEntry = RenderTargetEntryCreate(Arena, Width, Height, Format, Usage, AspectMask);
+    RenderTargetEntryCreate(Arena, Width, Height, Format, Usage, AspectMask, OutImage, OutEntry);
 }
-#endif
 
 inline render_target_entry RenderTargetSwapChainEntryCreate(u32 Width, u32 Height, VkFormat Format)
 {
