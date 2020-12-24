@@ -3,34 +3,62 @@
 // NOTE: Render Target
 //
 
-inline render_target_entry RenderTargetEntryCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format,
-                                                   VkImageUsageFlags Usage, VkImageAspectFlags AspectMask)
+inline render_target_entry RenderTargetEntryCreate(u32 Width, u32 Height, VkFormat Format, VkImageView View)
 {
     render_target_entry Result = {};
     Result.Width = Width;
     Result.Height = Height;
     Result.Format = Format;
-    VkImage2dCreate(RenderState->Device, Arena, Width, Height, Format, Usage, AspectMask, &Result.Image, &Result.View);
+    Result.View = View;
 
     return Result;
+}
+
+inline void RenderTargetEntryCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
+                                    VkImageAspectFlags AspectMask, VkImage* OutImage, render_target_entry* OutEntry)
+{
+    vk_image Image = VkImageCreate(RenderState->Device, Arena, Width, Height, Format, Usage, AspectMask);
+    *OutImage = Image.Image;
+    *OutEntry = RenderTargetEntryCreate(Width, Height, Format, Image.View);
+}
+
+inline render_target_entry RenderTargetCubeEntryCreate(u32 Width, u32 Height, VkFormat Format, VkImageView View)
+{
+    render_target_entry Result = {};
+    Result.Width = Width;
+    Result.Height = Height;
+    Result.Format = Format;
+    Result.View = View;
+
+    return Result;
+}
+
+inline void RenderTargetCubeEntryCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
+                                        VkImageAspectFlags AspectMask, VkImage* OutImage, render_target_entry* OutEntry)
+{
+    vk_image Image = VkCubeMapCreate(RenderState->Device, Arena, Width, Height, Format, Usage, AspectMask, 1);
+    *OutImage = Image.Image;
+    *OutEntry = RenderTargetCubeEntryCreate(Width, Height, Format, Image.View);
 }
 
 inline void RenderTargetEntryDestroy(render_target_entry Entry)
 {
     vkDestroyImageView(RenderState->Device, Entry.View, 0);
-    vkDestroyImage(RenderState->Device, Entry.Image, 0);
 }
 
+// TODO: FIX
+#if 0
 inline void RenderTargetEntryReCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
                                       VkImageAspectFlags AspectMask, render_target_entry* OutEntry)
 {
     Assert((OutEntry->Flags & RenderTargetEntry_SwapChain) == 0);
-    if (OutEntry->Image != VK_NULL_HANDLE)
+    if (OutEntry->View != VK_NULL_HANDLE)
     {
         RenderTargetEntryDestroy(*OutEntry);
     }
     *OutEntry = RenderTargetEntryCreate(Arena, Width, Height, Format, Usage, AspectMask);
 }
+#endif
 
 inline render_target_entry RenderTargetSwapChainEntryCreate(u32 Width, u32 Height, VkFormat Format)
 {
@@ -42,6 +70,74 @@ inline render_target_entry RenderTargetSwapChainEntryCreate(u32 Width, u32 Heigh
 
     return Result;
 }
+
+inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* RenderTarget)
+{
+    temp_mem TempMem = BeginTempMem(TempArena);
+
+    // NOTE: Create temp array to pass to VK
+    VkImageView* Views = PushArray(TempArena, VkImageView, RenderTarget->NumEntries);
+    for (u32 ViewId = 0; ViewId < RenderTarget->NumEntries; ++ViewId)
+    {
+        Views[ViewId] = RenderTarget->Entries[ViewId]->View;
+    }
+
+    // NOTE: Update size and recreate FBO
+    RenderTarget->Width = RenderTarget->Entries[0]->Width;
+    RenderTarget->Height = RenderTarget->Entries[0]->Height;
+    VkFboReCreate(RenderState->Device, RenderTarget->RenderPass, Views, RenderTarget->NumEntries, &RenderTarget->FrameBuffer,
+                  RenderTarget->Width, RenderTarget->Height);
+
+    EndTempMem(TempMem);
+}
+
+inline void RenderTargetPassBegin(render_target* RenderTarget, vk_commands Commands, u32 Flags)
+{
+    VkRenderPassBeginInfo BeginInfo = {};
+    BeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    BeginInfo.renderPass = RenderTarget->RenderPass;
+    BeginInfo.framebuffer = RenderTarget->FrameBuffer;
+    BeginInfo.renderArea.offset = {0, 0};
+    BeginInfo.renderArea.extent = { RenderTarget->Width, RenderTarget->Height };
+    BeginInfo.clearValueCount = RenderTarget->NumEntries;
+    BeginInfo.pClearValues = RenderTarget->ClearValues;
+    vkCmdBeginRenderPass(Commands.Buffer, &BeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    if (Flags & RenderTargetRenderPass_SetViewPort)
+    {
+        VkViewport ViewPort = {};
+        ViewPort.x = 0;
+        ViewPort.y = 0;
+        ViewPort.width = f32(RenderTarget->Width);
+        ViewPort.height = f32(RenderTarget->Height);
+        // TODO: How do we want to handle min/max depth?
+        ViewPort.minDepth = 0.0f;
+        ViewPort.maxDepth = 1.0f;
+        vkCmdSetViewport(Commands.Buffer, 0, 1, &ViewPort);
+    }
+    
+    if (Flags & RenderTargetRenderPass_SetScissor)
+    {
+        VkRect2D Scissor = {};
+        Scissor.offset = {};
+        Scissor.extent = { RenderTarget->Width, RenderTarget->Height };
+        vkCmdSetScissor(Commands.Buffer, 0, 1, &Scissor);
+    }
+}
+
+inline void RenderTargetNextSubPass(vk_commands Commands)
+{
+    vkCmdNextSubpass(Commands.Buffer, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+inline void RenderTargetPassEnd(vk_commands Commands)
+{
+    vkCmdEndRenderPass(Commands.Buffer);
+}
+
+//
+// NOTE: Render Target Builder
+//
 
 inline render_target_builder RenderTargetBuilderBegin(linear_arena* Arena, linear_arena* TempArena, u32 Width, u32 Height)
 {
@@ -95,70 +191,6 @@ inline render_target RenderTargetBuilderEnd(render_target_builder* Builder, VkRe
     return Result;
 }
 
-inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* RenderTarget)
-{
-    temp_mem TempMem = BeginTempMem(TempArena);
-
-    // NOTE: Create temp array to pass to VK
-    VkImageView* Views = PushArray(TempArena, VkImageView, RenderTarget->NumEntries);
-    for (u32 ViewId = 0; ViewId < RenderTarget->NumEntries; ++ViewId)
-    {
-        Views[ViewId] = RenderTarget->Entries[ViewId]->View;
-    }
-
-    // NOTE: Update size and recreate FBO
-    RenderTarget->Width = RenderTarget->Entries[0]->Width;
-    RenderTarget->Height = RenderTarget->Entries[0]->Height;
-    VkFboReCreate(RenderState->Device, RenderTarget->RenderPass, Views, RenderTarget->NumEntries, &RenderTarget->FrameBuffer,
-                  RenderTarget->Width, RenderTarget->Height);
-
-    EndTempMem(TempMem);
-}
-
-inline void RenderTargetRenderPassBegin(render_target* RenderTarget, vk_commands Commands, u32 Flags)
-{
-    VkRenderPassBeginInfo BeginInfo = {};
-    BeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    BeginInfo.renderPass = RenderTarget->RenderPass;
-    BeginInfo.framebuffer = RenderTarget->FrameBuffer;
-    BeginInfo.renderArea.offset = {0, 0};
-    BeginInfo.renderArea.extent = { RenderTarget->Width, RenderTarget->Height };
-    BeginInfo.clearValueCount = RenderTarget->NumEntries;
-    BeginInfo.pClearValues = RenderTarget->ClearValues;
-    vkCmdBeginRenderPass(Commands.Buffer, &BeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    if (Flags & RenderTargetRenderPass_SetViewPort)
-    {
-        VkViewport ViewPort = {};
-        ViewPort.x = 0;
-        ViewPort.y = 0;
-        ViewPort.width = f32(RenderTarget->Width);
-        ViewPort.height = f32(RenderTarget->Height);
-        // TODO: How do we want to handle min/max depth?
-        ViewPort.minDepth = 0.0f;
-        ViewPort.maxDepth = 1.0f;
-        vkCmdSetViewport(Commands.Buffer, 0, 1, &ViewPort);
-    }
-    
-    if (Flags & RenderTargetRenderPass_SetScissor)
-    {
-        VkRect2D Scissor = {};
-        Scissor.offset = {};
-        Scissor.extent = { RenderTarget->Width, RenderTarget->Height };
-        vkCmdSetScissor(Commands.Buffer, 0, 1, &Scissor);
-    }
-}
-
-inline void RenderTargetNextSubPass(vk_commands Commands)
-{
-    vkCmdNextSubpass(Commands.Buffer, VK_SUBPASS_CONTENTS_INLINE);
-}
-
-inline void RenderTargetRenderPassEnd(vk_commands Commands)
-{
-    vkCmdEndRenderPass(Commands.Buffer);
-}
-
 //
 // NOTE: FullScreen Pass
 //
@@ -204,7 +236,7 @@ inline render_fullscreen_pass FullScreenPassCreate(char* FragmentShader, char* M
 
 inline void FullScreenPassRender(vk_commands Commands, render_fullscreen_pass* Pass)
 {
-    RenderTargetRenderPassBegin(Pass->RenderTarget, Commands, RenderTargetRenderPass_SetViewPort | RenderTargetRenderPass_SetScissor);
+    RenderTargetPassBegin(Pass->RenderTarget, Commands, RenderTargetRenderPass_SetViewPort | RenderTargetRenderPass_SetScissor);
     
     vkCmdBindPipeline(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pass->Pipeline->Handle);
     if (Pass->NumDescriptorSets > 0)
@@ -217,7 +249,7 @@ inline void FullScreenPassRender(vk_commands Commands, render_fullscreen_pass* P
     vkCmdBindVertexBuffers(Commands.Buffer, 0, 1, &RenderState->FullScreenVbo, &Offset);
     vkCmdDraw(Commands.Buffer, 6, 1, 0, 0);
 
-    RenderTargetRenderPassEnd(Commands);
+    RenderTargetPassEnd(Commands);
 }
 
 //
@@ -818,10 +850,40 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         VkCheckResult(vkCreateSemaphore(RenderState->Device, &SemaphoreCreateInfo, 0, &RenderState->ImageAvailableSemaphore));
     }
 
+    // NOTE: Init descriptor pool
+    {
+        VkDescriptorPoolSize Pools[5] = {};
+        Pools[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        Pools[0].descriptorCount = 1000;
+        Pools[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        Pools[1].descriptorCount = 1000;
+        Pools[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        Pools[2].descriptorCount = 1000;
+        Pools[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+        Pools[3].descriptorCount = 1000;
+        Pools[4].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+        Pools[4].descriptorCount = 1000;
+            
+        VkDescriptorPoolCreateInfo CreateInfo = {};
+        CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        CreateInfo.maxSets = 1000;
+        CreateInfo.poolSizeCount = ArrayCount(Pools);
+        CreateInfo.pPoolSizes = Pools;
+        VkCheckResult(vkCreateDescriptorPool(RenderState->Device, &CreateInfo, 0, &RenderState->DescriptorPool));
+    }
+    
+    // NOTE: Cube Map Globals
+    {
+        vk_descriptor_layout_builder Builder = VkDescriptorLayoutBegin(&RenderState->GlobalCubeMapDescLayout);
+        VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+        VkDescriptorLayoutEnd(RenderState->Device, &Builder);
+    }
+    
     // NOTE: Upload render state specific assets
     {
         VkCommandsBegin(RenderState->Device, RenderState->Commands);
 
+        // NOTE: Full Screen Data
         {
             f32 Vertices[] =
                 {
@@ -833,7 +895,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                     -1.0f, -1.0f,  1.0f, 0.0f, 0.0f,
                 };
             
-            RenderState->FullScreenVbo = VkBufferCreate(RenderState->Device, &RenderState->HostArena,
+            RenderState->FullScreenVbo = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                                        sizeof(Vertices));
 
@@ -841,6 +903,41 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                                                  BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                                  BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
             Copy(Vertices, Data, sizeof(Vertices));
+        }
+
+        // NOTE: Push global cube map data
+        {
+            u32 EntrySize = u32(Max(RenderState->DeviceLimits.minUniformBufferOffsetAlignment, sizeof(global_cubemap_input_entry)));
+            RenderState->GlobalCubeMapData = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
+                                                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                                            EntrySize*6);
+            u8* Data = VkTransferPushWrite(&RenderState->TransferManager, RenderState->GlobalCubeMapData, EntrySize*6,
+                                           BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
+                                           BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT));
+
+            m4 PerspectiveTransform = VkPerspProjM4(1.0f, DegreeToRadians(90.0f), 0.1f, 10.0f);
+            m4 Transforms[6] =
+            {
+                PerspectiveTransform * LookAtM4(V3(-1, 0, 0), V3(0, 1, 0), V3(0, 0, 0)), // NOTE: Left
+                PerspectiveTransform * LookAtM4(V3(1, 0, 0), V3(0, 1, 0), V3(0, 0, 0)), // NOTE: Right
+                PerspectiveTransform * LookAtM4(V3(0, 1, 0), V3(0, 0, -1), V3(0, 0, 0)), // NOTE: Top
+                PerspectiveTransform * LookAtM4(V3(0, -1, 0), V3(0, 0, 1), V3(0, 0, 0)), // NOTE: Bottom
+                PerspectiveTransform * LookAtM4(V3(0, 0, 1), V3(0, 1, 0), V3(0, 0, 0)), // NOTE: Front
+                PerspectiveTransform * LookAtM4(V3(0, 0, -1), V3(0, 1, 0), V3(0, 0, 0)), // NOTE: Back
+            };
+
+            for (u32 FaceId = 0; FaceId < 6; ++FaceId)
+            {
+                global_cubemap_input_entry* Inputs = (global_cubemap_input_entry*)Data;
+                Inputs->WVPTransform = Transforms[FaceId];
+                Inputs->LayerId = FaceId;
+
+                Data += EntrySize;
+            }
+            
+            RenderState->GlobalCubeMapDescriptor = VkDescriptorSetAllocate(RenderState->Device, RenderState->DescriptorPool, RenderState->GlobalCubeMapDescLayout);
+            VkDescriptorBufferWrite(&RenderState->DescriptorManager, RenderState->GlobalCubeMapDescriptor, 0,
+                                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, RenderState->GlobalCubeMapData);
         }
         
         VkTransferManagerFlush(&RenderState->TransferManager, RenderState->Device, RenderState->Commands.Buffer, &RenderState->BarrierManager);

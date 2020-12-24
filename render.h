@@ -151,7 +151,6 @@ struct render_target_entry
     u32 Width;
     u32 Height;
     VkFormat Format;
-    VkImage Image;
     VkImageView View;
 };
 
@@ -202,6 +201,17 @@ struct render_fullscreen_pass
     vk_pipeline* Pipeline;
     u32 NumDescriptorSets;
     VkDescriptorSet* DescriptorSets;
+};
+
+//
+// NOTE: Cube Map Data
+//
+
+struct global_cubemap_input_entry
+{
+    m4 WVPTransform;
+    i32 LayerId;
+    u32 Pad[15];
 };
 
 //
@@ -285,6 +295,11 @@ struct render_state
 
     // NOTE: Fullscreen Pass
     VkBuffer FullScreenVbo;
+
+    // NOTE: Cube Map Globals
+    VkBuffer GlobalCubeMapData;
+    VkDescriptorSet GlobalCubeMapDescriptor;
+    VkDescriptorSetLayout GlobalCubeMapDescLayout;
 };
 
 global render_state* RenderState;

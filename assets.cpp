@@ -26,7 +26,7 @@ internal vk_image TextureLoad(char* ImagePath, VkFormat Format, b32 FloatType, u
         NumComponents = ForceComponentCount;
     }
     
-    Result = VkImage2dCreate(RenderState->Device, &RenderState->GpuArena, Width, Height, Format,
+    Result = VkImageCreate(RenderState->Device, &RenderState->GpuArena, Width, Height, Format,
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     // TODO: Better barrier here pls
