@@ -101,6 +101,7 @@
     VK_DEVICE_LEVEL_FUNC(   vkCmdResetQueryPool );                      \
     VK_DEVICE_LEVEL_FUNC(   vkGetQueryPoolResults );                    \
     VK_DEVICE_LEVEL_FUNC(   vkCmdWriteTimestamp );                      \
+    VK_DEVICE_LEVEL_FUNC(   vkDestroyRenderPass );                      \
 
 
 VULKAN_FUNC_LIST;
@@ -111,30 +112,6 @@ VULKAN_FUNC_LIST;
 #undef VK_DEVICE_LEVEL_FUNC
 
 #include "graphics_utils\vulkan\vulkan_utils.h"
-
-#if 0
-struct render_mesh
-{
-    u32 VertexOffset;
-    u32 NumVertices;
-    u32 IndexOffset;
-    u32 NumIndices;
-
-    u32 MaterialId;
-};
-
-struct render_model
-{
-    VkBuffer Vertices;
-    VkBuffer Indices;
-
-    u32 NumMeshes;
-    render_mesh* MeshArray;
-    
-    u32 NumTextures;
-    VkImage* TextureArray;
-};
-#endif
 
 //
 // NOTE: Render Target
@@ -187,21 +164,12 @@ struct render_target_builder
     u32 NumEntries;
     render_target_entry** Entries;
     VkClearValue* ClearValues;
+
+    // NOTE: If we want to keep the VkRenderPass from before
+    VkRenderPass CopyRenderPass;
 };
 
 inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* RenderTarget);
-
-//
-// NOTE: Fullscreen Passes
-//
-
-struct render_fullscreen_pass
-{
-    render_target* RenderTarget;
-    vk_pipeline* Pipeline;
-    u32 NumDescriptorSets;
-    VkDescriptorSet* DescriptorSets;
-};
 
 //
 // NOTE: Cube Map Data
@@ -295,6 +263,8 @@ struct render_state
 
     // NOTE: Fullscreen Pass
     VkBuffer FullScreenVbo;
+    VkDescriptorSetLayout CopyImageDescLayout;
+    VkDescriptorSetLayout ResolveDepthDescLayout;
 
     // NOTE: Cube Map Globals
     VkBuffer GlobalCubeMapData;

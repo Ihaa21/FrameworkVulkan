@@ -1,6 +1,6 @@
 
 //
-// NOTE: Render Target
+// NOTE: Render Target Entry
 //
 
 inline render_target_entry RenderTargetEntryCreate(u32 Width, u32 Height, VkFormat Format, VkImageView View)
@@ -18,6 +18,15 @@ inline void RenderTargetEntryCreate(vk_linear_arena* Arena, u32 Width, u32 Heigh
                                     VkImageAspectFlags AspectMask, VkImage* OutImage, render_target_entry* OutEntry)
 {
     vk_image Image = VkImageCreate(RenderState->Device, Arena, Width, Height, Format, Usage, AspectMask);
+    *OutImage = Image.Image;
+    *OutEntry = RenderTargetEntryCreate(Width, Height, Format, Image.View);
+}
+
+inline void RenderTargetEntryCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
+                                    VkImageAspectFlags AspectMask, VkSampleCountFlagBits SampleCount, VkImage* OutImage,
+                                    render_target_entry* OutEntry)
+{
+    vk_image Image = VkImageCreate(RenderState->Device, Arena, Width, Height, Format, Usage, AspectMask, SampleCount);
     *OutImage = Image.Image;
     *OutEntry = RenderTargetEntryCreate(Width, Height, Format, Image.View);
 }
@@ -58,6 +67,19 @@ inline void RenderTargetEntryReCreate(vk_linear_arena* Arena, u32 Width, u32 Hei
     RenderTargetEntryCreate(Arena, Width, Height, Format, Usage, AspectMask, OutImage, OutEntry);
 }
 
+inline void RenderTargetEntryReCreate(vk_linear_arena* Arena, u32 Width, u32 Height, VkFormat Format, VkImageUsageFlags Usage,
+                                      VkImageAspectFlags AspectMask, VkSampleCountFlagBits SampleCount, VkImage* OutImage,
+                                      render_target_entry* OutEntry)
+{
+    Assert((OutEntry->Flags & RenderTargetEntry_SwapChain) == 0);
+    if (OutEntry->View != VK_NULL_HANDLE)
+    {
+        vkDestroyImage(RenderState->Device, *OutImage, 0);
+        RenderTargetEntryDestroy(*OutEntry);
+    }
+    RenderTargetEntryCreate(Arena, Width, Height, Format, Usage, AspectMask, SampleCount, OutImage, OutEntry);
+}
+
 inline render_target_entry RenderTargetSwapChainEntryCreate(u32 Width, u32 Height, VkFormat Format)
 {
     render_target_entry Result = {};
@@ -67,6 +89,16 @@ inline render_target_entry RenderTargetSwapChainEntryCreate(u32 Width, u32 Heigh
     Result.Flags = RenderTargetEntry_SwapChain;
 
     return Result;
+}
+
+//
+// NOTE: Render Target
+//
+
+inline void RenderTargetDestroy(render_target* Target)
+{
+    vkDestroyFramebuffer(RenderState->Device, Target->FrameBuffer, 0);
+    vkDestroyRenderPass(RenderState->Device, Target->RenderPass, 0);
 }
 
 inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* RenderTarget)
@@ -193,18 +225,10 @@ inline render_target RenderTargetBuilderEnd(render_target_builder* Builder, VkRe
 // NOTE: FullScreen Pass
 //
 
-inline render_fullscreen_pass FullScreenPassCreate(char* FragmentShader, char* MainFuncName, render_target* RenderTarget, u32 NumLayouts,
-                                                   VkDescriptorSetLayout* Layouts, u32 NumDescriptorSets, VkDescriptorSet* DescriptorSets)
+inline vk_pipeline* FullScreenPipelineCreate(char* FragmentShader, char* MainFuncName, VkRenderPass RenderPass, u32 SubPassId,
+                                             u32 NumLayouts, VkDescriptorSetLayout* Layouts)
 {
-    render_fullscreen_pass Result = {};
-
-    Result.RenderTarget = RenderTarget;
-    Result.NumDescriptorSets = NumDescriptorSets;
-    if (Result.NumDescriptorSets > 0)
-    {
-        Result.DescriptorSets = PushArray(&RenderState->CpuArena, VkDescriptorSet, Result.NumDescriptorSets);
-        CopyArray(DescriptorSets, Result.DescriptorSets, VkDescriptorSet, Result.NumDescriptorSets);
-    }
+    vk_pipeline* Result = {};
     
     // NOTE: Create pipeline
     {
@@ -225,29 +249,32 @@ inline render_fullscreen_pass FullScreenPassCreate(char* FragmentShader, char* M
         VkPipelineColorAttachmentAdd(&Builder, VK_FALSE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO,
                                      VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO);
 
-        Result.Pipeline = VkPipelineBuilderEnd(&Builder, RenderState->Device, &RenderState->PipelineManager, RenderTarget->RenderPass, 0,
-                                               Layouts, NumLayouts);
+        Result = VkPipelineBuilderEnd(&Builder, RenderState->Device, &RenderState->PipelineManager, RenderPass, SubPassId,
+                                      Layouts, NumLayouts);
     }
 
     return Result;
 }
 
-inline void FullScreenPassRender(vk_commands Commands, render_fullscreen_pass* Pass)
+inline vk_pipeline* FullScreenCopyImageCreate(VkRenderPass RenderPass, u32 SubPassId)
 {
-    RenderTargetPassBegin(Pass->RenderTarget, Commands, RenderTargetRenderPass_SetViewPort | RenderTargetRenderPass_SetScissor);
-    
-    vkCmdBindPipeline(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pass->Pipeline->Handle);
-    if (Pass->NumDescriptorSets > 0)
-    {
-        vkCmdBindDescriptorSets(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pass->Pipeline->Layout, 0, Pass->NumDescriptorSets,
-                                Pass->DescriptorSets, 0, 0);
-    }
+    vk_pipeline* Result = FullScreenPipelineCreate("..\\libs\\framework_vulkan\\copy_image_frag.spv", "main", RenderPass, SubPassId, 1, &RenderState->CopyImageDescLayout);
+    return Result;
+}
 
+inline vk_pipeline* FullScreenResolveDepthCreate(VkRenderPass RenderPass, u32 SubPassId)
+{
+    vk_pipeline* Result = FullScreenPipelineCreate("..\\libs\\framework_vulkan\\resolve_depth_frag.spv", "main", RenderPass, SubPassId, 1, &RenderState->ResolveDepthDescLayout);
+    return Result;
+}
+
+inline void FullScreenPassRender(vk_commands Commands, vk_pipeline* Pipeline, u32 NumDescriptors, VkDescriptorSet* Descriptors)
+{
+    vkCmdBindPipeline(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Handle);
+    vkCmdBindDescriptorSets(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Layout, 0, NumDescriptors, Descriptors, 0, 0);
     VkDeviceSize Offset = 0;
     vkCmdBindVertexBuffers(Commands.Buffer, 0, 1, &RenderState->FullScreenVbo, &Offset);
     vkCmdDraw(Commands.Buffer, 6, 1, 0, 0);
-
-    RenderTargetPassEnd(Commands);
 }
 
 //
@@ -877,6 +904,23 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         VkDescriptorLayoutEnd(RenderState->Device, &Builder);
     }
     
+    // NOTE: FullScreen Pass Layouts
+    {
+        // NOTE: Copy Image
+        {
+            vk_descriptor_layout_builder Builder = VkDescriptorLayoutBegin(&RenderState->CopyImageDescLayout);
+            VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+            VkDescriptorLayoutEnd(RenderState->Device, &Builder);
+        }
+
+        // NOTE: Resolve Depth
+        {
+            vk_descriptor_layout_builder Builder = VkDescriptorLayoutBegin(&RenderState->ResolveDepthDescLayout);
+            VkDescriptorLayoutAdd(&Builder, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT);
+            VkDescriptorLayoutEnd(RenderState->Device, &Builder);
+        }
+    }
+
     // NOTE: Upload render state specific assets
     {
         VkCommandsBegin(RenderState->Device, RenderState->Commands);
