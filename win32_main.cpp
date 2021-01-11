@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <intrin.h>
 
+#define VALIDATION 1
+
 #include "platform.h"
 #include "win32_main.h"
 

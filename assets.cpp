@@ -277,15 +277,15 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
 #undef global
 #undef local_global
 
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
+#include "assimp/Importer.hpp"
+#include "assimp/scene.h"
+#include "assimp/postprocess.h"
 
 #define internal static
 #define global static
 #define local_global static
 
-internal procedural_mesh AssimpLoadModel(char* ModelPath)
+internal procedural_mesh AssetsPushModel(char* ModelPath)
 {
     // IMPORTANT: Its assumed that this is called inside of a tranfser operation
     // NOTE: https://learnopengl.com/Model-Loading/Model
