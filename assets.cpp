@@ -100,16 +100,16 @@ inline procedural_mesh AssetsPushCube()
         f32 Vertices[] = 
             {
                 // NOTE: Front face
-                -0.5, -0.5, 0.5, 0, 0, 1, 0, 0,
-                0.5, -0.5, 0.5, 0, 0, 1, 0, 0,
-                0.5, 0.5, 0.5, 0, 0, 1, 0, 0,
-                -0.5, 0.5, 0.5, 0, 0, 1, 0, 0,
+                -0.5, -0.5, 0.5, 0, 0, -1, 0, 0,
+                0.5, -0.5, 0.5, 0, 0, -1, 0, 0,
+                0.5, 0.5, 0.5, 0, 0, -1, 0, 0,
+                -0.5, 0.5, 0.5, 0, 0, -1, 0, 0,
 
                 // NOTE: Back face
-                -0.5, -0.5, -0.5, 0, 0, -1, 0, 0,
-                0.5, -0.5, -0.5, 0, 0, -1, 0, 0,
-                0.5, 0.5, -0.5, 0, 0, -1, 0, 0,
-                -0.5, 0.5, -0.5, 0, 0, -1, 0, 0,
+                -0.5, -0.5, -0.5, 0, 0, 1, 0, 0,
+                0.5, -0.5, -0.5, 0, 0, 1, 0, 0,
+                0.5, 0.5, -0.5, 0, 0, 1, 0, 0,
+                -0.5, 0.5, -0.5, 0, 0, 1, 0, 0,
 
                 // NOTE: Left face
                 -0.5, -0.5, -0.5, -1, 0, 0, 0, 0,
@@ -272,8 +272,6 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
           twice in different places. The loader has to aggregate everything then. 
  */
 
-#if 0
-
 // TODO: This is a hack rn, do this better
 #undef internal
 #undef global
@@ -286,6 +284,133 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
 #define internal static
 #define global static
 #define local_global static
+
+internal procedural_mesh AssimpLoadModel(char* ModelPath)
+{
+    // IMPORTANT: Its assumed that this is called inside of a tranfser operation
+    // NOTE: https://learnopengl.com/Model-Loading/Model
+    procedural_mesh Result = {};
+    
+    Assimp::Importer Importer;
+    const aiScene* Scene = Importer.ReadFile(ModelPath, aiProcess_Triangulate | aiProcess_OptimizeMeshes | aiProcess_GenSmoothNormals);
+    if(!Scene || Scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !Scene->mRootNode) 
+    {
+        const char* Error = Importer.GetErrorString();
+        InvalidCodePath;
+    }
+
+    // NOTE: Count number of vertices + flatten everything to one mesh
+    u64 TotalNumVertices = 0;
+    {
+        for (u64 MeshId = 0; MeshId < Scene->mNumMeshes; MeshId++)
+        {
+            aiMesh* SrcMesh = Scene->mMeshes[MeshId];
+            TotalNumVertices += SrcMesh->mNumVertices;
+
+            for (u32 FaceId = 0; FaceId < SrcMesh->mNumFaces; FaceId++)
+            {
+                aiFace Face = SrcMesh->mFaces[FaceId];
+
+                Result.NumIndices += Face.mNumIndices;
+            }
+        }
+    }
+
+    // NOTE: Create GPU buffers
+    vertex* Vertices = {};
+    u32* Indices = {};
+    {
+        Result.Vertices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                         sizeof(vertex)*TotalNumVertices);
+        Vertices = VkTransferPushWriteArray(&RenderState->TransferManager, Result.Vertices, vertex, TotalNumVertices,
+                                            BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
+                                            BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
+
+        Result.Indices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                                        sizeof(u32)*Result.NumIndices);
+        Indices = VkTransferPushWriteArray(&RenderState->TransferManager, Result.Indices, u32, Result.NumIndices,
+                                           BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
+                                           BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
+    }
+    
+    // NOTE: Write Vertices
+    {
+        // NOTE: Load vertices
+        f32 MaxPosAxis = 0.0f;
+        vertex* Vertex = Vertices;
+        for (u32 MeshId = 0; MeshId < Scene->mNumMeshes; MeshId++)
+        {
+            aiMesh* SrcMesh = Scene->mMeshes[MeshId];
+
+            // NOTE: Process vertices
+            Assert(SrcMesh->mNumUVComponents[1] == 0);
+            for (u32 VertId = 0; VertId < SrcMesh->mNumVertices; ++VertId, ++Vertex)
+            {
+                Vertex->Pos = V3(SrcMesh->mVertices[VertId].x,
+                                 SrcMesh->mVertices[VertId].y,
+                                 SrcMesh->mVertices[VertId].z);
+             
+                // NOTE: We mul by 2.0f to map to -0.5, 0.5 range, not -1, 1 range
+                MaxPosAxis = Max(MaxPosAxis, 2.0f*Abs(Vertex->Pos.x));
+                MaxPosAxis = Max(MaxPosAxis, 2.0f*Abs(Vertex->Pos.y));
+                MaxPosAxis = Max(MaxPosAxis, 2.0f*Abs(Vertex->Pos.z));
+
+                Vertex->Normal = V3(SrcMesh->mNormals[VertId].x,
+                                    SrcMesh->mNormals[VertId].y,
+                                    SrcMesh->mNormals[VertId].z);
+
+                if (SrcMesh->mTextureCoords[0])
+                {
+                    Vertex->Uv = V2(SrcMesh->mTextureCoords[0][VertId].x,
+                                    SrcMesh->mTextureCoords[0][VertId].y);
+                }
+                else
+                {
+                    // NOTE: Some meshes have no tex coords for some reason
+                    Vertex->Uv = V2(0, 0);
+                }
+            }
+        }
+    
+        // NOTE: Normalize all positions of the model
+        Assert(MaxPosAxis != 0.0f);
+        Vertex = Vertices;
+        for (u32 PosId = 0; PosId < TotalNumVertices; ++PosId, ++Vertex)
+        {
+            // NOTE: This maps the model to be in -0.5, 0.5 space
+            Vertex->Pos = Vertex->Pos / (MaxPosAxis);
+        }
+    }
+
+    // NOTE: Write indicies
+    {
+        u32 IndexOffset = 0;
+        u32 TmpIndexOffset = 0;
+        u32* Index = Indices;
+        for (u32 MeshId = 0; MeshId < Scene->mNumMeshes; MeshId++)
+        {
+            aiMesh* SrcMesh = Scene->mMeshes[MeshId];
+            
+            // NOTE: Process indicies
+            for (u32 FaceId = 0; FaceId < SrcMesh->mNumFaces; FaceId++)
+            {
+                aiFace Face = SrcMesh->mFaces[FaceId];
+                for (u32 IndexId = 0; IndexId < Face.mNumIndices; IndexId++)
+                {
+                    *Index++ = Face.mIndices[IndexId] + IndexOffset;
+                }
+
+                TmpIndexOffset += Face.mNumIndices;
+            }
+
+            IndexOffset = TmpIndexOffset;
+        }
+    }
+        
+    return Result;
+}
+
+#if 0
 
 //
 // NOTE: Animation loading functions

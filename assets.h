@@ -1,7 +1,19 @@
 #pragma once
 
+#pragma pack(push, 1)
+
+struct vertex
+{
+    v3 Pos;
+    v3 Normal;
+    v2 Uv;
+};
+
+#pragma pack(pop)
+
 struct procedural_mesh
 {
+    // NOTE: Has position, normal, uv
     VkBuffer Vertices;
     u32 NumIndices;
     VkBuffer Indices;
