@@ -14,7 +14,7 @@ struct frame_input
     f32 MouseScroll;
 
     // NOTE: Keyboard input
-    b32 KeysDown[255];
+    b32 KeysDown[256];
 };
 
 #define DEMO_INIT(name) void name(void* ProgramMemory, mm ProgramMemorySize, HMODULE VulkanLib, HINSTANCE hInstance, u32 WindowWidth, u32 WindowHeight, HWND WindowHandle)
@@ -31,3 +31,9 @@ typedef DEMO_CODE_RELOAD(demo_code_reload);
 
 #define DEMO_MAIN_LOOP(name) void name(frame_input* PrevInput, frame_input* CurrInput, f32 FrameTime)
 typedef DEMO_MAIN_LOOP(demo_main_loop);
+
+//
+// NOTE: Convienence
+//
+
+// TODO: Add more calls here from ui and graphics utils

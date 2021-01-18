@@ -250,7 +250,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
                         b32 WasDown = ((Message.lParam & (1 << 30)) != 0);
                         b32 IsDown = ((Message.lParam & (1 << 31)) == 0);
 
-                        if (VKCode >= 'A' && VKCode <= 'z')
+                        if (VKCode >= 0 && VKCode <= 255)
                         {
                             CurrInput.KeysDown[VKCode] = IsDown;
                         }

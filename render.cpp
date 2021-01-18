@@ -246,8 +246,8 @@ inline vk_pipeline* FullScreenPipelineCreate(char* FragmentShader, char* MainFun
         VkPipelineVertexBindingEnd(&Builder);
                 
         // NOTE: Set the blending state
-        VkPipelineColorAttachmentAdd(&Builder, VK_FALSE, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO,
-                                     VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO);
+        VkPipelineColorAttachmentAdd(&Builder, VK_BLEND_OP_ADD, VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO, VK_BLEND_OP_ADD,
+                                     VK_BLEND_FACTOR_ONE, VK_BLEND_FACTOR_ZERO);
 
         Result = VkPipelineBuilderEnd(&Builder, RenderState->Device, &RenderState->PipelineManager, RenderPass, SubPassId,
                                       Layouts, NumLayouts);
