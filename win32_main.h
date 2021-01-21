@@ -20,6 +20,7 @@ struct prog_demo_code
 
 struct prog_state
 {
+    b32 Minimized;
     b32 VkInitialized;
     
     mm ProgramMemorySize;

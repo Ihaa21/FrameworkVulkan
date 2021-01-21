@@ -101,15 +101,22 @@ internal LRESULT CALLBACK Win32MainWindowCallBack(HWND Window, UINT Message, WPA
 
         case WM_SIZE:
         {
-            RECT Rect;
-            Assert(GetClientRect(Window, &Rect));
-            if (GlobalState.VkInitialized)
+            if (WParam == SIZE_MINIMIZED)
             {
-                u32 Width = Rect.right - Rect.left;
-                u32 Height = Rect.bottom - Rect.top;
-                GlobalState.DemoCode.SwapChainChange(Width, Height);
+                GlobalState.Minimized = true;
             }
-
+            else
+            {
+                GlobalState.Minimized = false;
+                RECT Rect;
+                Assert(GetClientRect(Window, &Rect));
+                if (GlobalState.VkInitialized)
+                {
+                    u32 Width = Rect.right - Rect.left;
+                    u32 Height = Rect.bottom - Rect.top;
+                    GlobalState.DemoCode.SwapChainChange(Width, Height);
+                }
+            }
         } break;
         
         default:
@@ -297,7 +304,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
             }
         }
 
-        GlobalState.DemoCode.MainLoop(&PrevInput, &CurrInput, 1.0f / 60.0f);
+        if (!GlobalState.Minimized)
+        {
+            GlobalState.DemoCode.MainLoop(&PrevInput, &CurrInput, 1.0f / 60.0f);
+        }
     }
 
     GlobalState.DemoCode.Destroy();
