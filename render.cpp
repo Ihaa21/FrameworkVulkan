@@ -829,14 +829,14 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
     // NOTE: Allocate host memory
     {
         u64 HeapSize = GigaBytes(1);
-        RenderState->HostArena = VkLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->StagingMemoryId, HeapSize), HeapSize);
+        RenderState->HostArena = VkLinearArenaCreate(RenderState->Device, RenderState->StagingMemoryId, HeapSize);
         VkCheckResult(vkMapMemory(RenderState->Device, RenderState->HostArena.Memory, 0, HeapSize, 0, (void**)&RenderState->HostPtr));
     }
     
     // NOTE: Allocate GPU memory
     {
         u64 HeapSize = GigaBytes(1);
-        RenderState->GpuArena = VkLinearArenaCreate(VkMemoryAllocate(RenderState->Device, RenderState->LocalMemoryId, HeapSize), HeapSize);
+        RenderState->GpuArena = VkLinearArenaCreate(RenderState->Device, RenderState->LocalMemoryId, HeapSize);
     }
 
     // NOTE: Create Managers
