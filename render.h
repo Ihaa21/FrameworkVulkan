@@ -102,6 +102,7 @@
     VK_DEVICE_LEVEL_FUNC(   vkGetQueryPoolResults );                    \
     VK_DEVICE_LEVEL_FUNC(   vkCmdWriteTimestamp );                      \
     VK_DEVICE_LEVEL_FUNC(   vkDestroyRenderPass );                      \
+    VK_DEVICE_LEVEL_FUNC(   vkCmdDrawIndirect );                        \
 
 
 VULKAN_FUNC_LIST;
