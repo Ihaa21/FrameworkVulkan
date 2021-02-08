@@ -841,7 +841,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
 
     // NOTE: Create Managers
     RenderState->BarrierManager = VkBarrierManagerCreate(&RenderState->CpuArena, 1000);
-    RenderState->DescriptorManager = VkDescriptorManagerCreate(&RenderState->CpuArena, 100);
+    RenderState->DescriptorManager = VkDescriptorManagerCreate(&RenderState->CpuArena, 500);
     RenderState->TransferManager = VkTransferManagerCreate(RenderState->Device, RenderState->StagingMemoryId, &RenderState->CpuArena,
                                                           &RenderState->GpuArena, u32(RenderState->DeviceLimits.nonCoherentAtomSize),
                                                           InitParams.StagingBufferSize, 100, 100);

@@ -26,6 +26,7 @@ enum camera_type
     CameraType_None,
 
     CameraType_Fps,
+    CameraType_TopDown,
 };
 
 struct fps_camera
@@ -33,6 +34,12 @@ struct fps_camera
     q4 Orientation;
     f32 TurningVelocity;
     f32 Velocity;
+};
+
+struct top_down_camera
+{
+    f32 MoveVelocity;
+    f32 ZoomVelocity;
 };
 
 struct camera
@@ -50,7 +57,8 @@ struct camera
     camera_type Type;
     union
     {
-        fps_camera FpsCamera;
+        fps_camera Fps;
+        top_down_camera TopDown;
     };
 
     VkBuffer GpuBuffer;

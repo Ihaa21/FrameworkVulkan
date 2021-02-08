@@ -2,7 +2,14 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-internal vk_image TextureLoad(char* ImagePath, VkFormat Format, b32 FloatType, u32 ComponentSize, u32 ForceComponentCount = 0)
+struct texture_load_params
+{
+    u32 ForceComponentCount;
+    b32 FlipY;
+    b32 FloatType;
+};
+
+internal vk_image TextureLoad(char* ImagePath, VkFormat Format, u32 ComponentSize, texture_load_params LoadParams)
 {
     // IMPORTANT: We assume this is happening inside of a transfer op
     vk_image Result = {};
@@ -11,23 +18,23 @@ internal vk_image TextureLoad(char* ImagePath, VkFormat Format, b32 FloatType, u
     i32 Width = 0;
     i32 Height = 0;
     u8* Pixels = 0;
-    if (FloatType)
+    if (LoadParams.FloatType)
     {
-        Pixels = (u8*)stbi_loadf(ImagePath, &Width, &Height, &NumComponents, ForceComponentCount);
+        Pixels = (u8*)stbi_loadf(ImagePath, &Width, &Height, &NumComponents, LoadParams.ForceComponentCount);
     }
     else
     {
-        Pixels = (u8*)stbi_load(ImagePath, &Width, &Height, &NumComponents, ForceComponentCount);
+        Pixels = (u8*)stbi_load(ImagePath, &Width, &Height, &NumComponents, LoadParams.ForceComponentCount);
     }
     Assert(Pixels);
     
-    if (ForceComponentCount > 0)
+    if (LoadParams.ForceComponentCount > 0)
     {
-        NumComponents = ForceComponentCount;
+        NumComponents = LoadParams.ForceComponentCount;
     }
     
     Result = VkImageCreate(RenderState->Device, &RenderState->GpuArena, Width, Height, Format,
-                             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+                           VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     // TODO: Better barrier here pls
     u8* GpuMemory = VkTransferPushWriteImage(&RenderState->TransferManager, Result.Image, Width, Height, ComponentSize*NumComponents, 
@@ -36,10 +43,43 @@ internal vk_image TextureLoad(char* ImagePath, VkFormat Format, b32 FloatType, u
                                              BarrierMask(VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
 
     u32 ImageSize = Width*Height*NumComponents*ComponentSize;
-    Copy(Pixels, GpuMemory, ImageSize);
+
+    if (LoadParams.FlipY)
+    {
+        u32 NumPixelBytes = ComponentSize * NumComponents;
+        u8* Src = Pixels;
+        u8* Dst = GpuMemory + ImageSize - 1;
+        for (i32 Y = 0; Y < Height; ++Y)
+        {
+            for (i32 X = 0; X < Width; ++X)
+            {
+                for (u32 PixelByte = 0; PixelByte < NumPixelBytes; ++PixelByte)
+                {
+                    *Dst-- = *Src++;
+                }
+            }
+        }
+    }
+    else
+    {
+        Copy(Pixels, GpuMemory, ImageSize);
+    }
     
     // NOTE: Delete file from memory
     stbi_image_free(Pixels);
+
+    return Result;
+}
+
+inline vk_image TextureLoad(char* ImagePath, VkFormat Format, b32 FlipY, u32 ComponentSize, u32 ForceComponentCount = 0)
+{
+    vk_image Result = {};
+    
+    texture_load_params LoadParams = {};
+    LoadParams.ForceComponentCount = ForceComponentCount;
+    LoadParams.FlipY = FlipY;
+    LoadParams.FloatType = false;
+    Result = TextureLoad(ImagePath, Format, ComponentSize, LoadParams);
 
     return Result;
 }
