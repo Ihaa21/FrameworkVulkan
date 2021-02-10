@@ -38,16 +38,26 @@ struct fps_camera
 
 struct top_down_camera
 {
+    f32 Angle;
     f32 MoveVelocity;
     f32 ZoomVelocity;
 };
 
 struct camera
 {
-    f32 AspectRatio;
-    f32 Near;
-    f32 Far;
-    f32 Fov;
+    b32 IsPerspective;
+
+    f32 PerspNear;
+    f32 PerspFar;
+    f32 PerspAspectRatio;
+    f32 PerspFov;
+    
+    f32 OrthoNear;
+    f32 OrthoFar;
+    f32 OrthoLeft;
+    f32 OrthoRight;
+    f32 OrthoTop;
+    f32 OrthoBottom;
     
     v3 Pos;
     v3 View;

@@ -6,17 +6,11 @@
    $Notice: (C) Copyright 2014 by Dream.Inc, Inc. All Rights Reserved. $
    ======================================================================== */
 
-inline camera CameraCreate_(v3 Pos, v3 View, v3 Up, v3 Right, f32 AspectRatio, f32 Near, f32 Far, f32 Fov)
+inline camera CameraCreate_(v3 Pos, v3 View, v3 Up, v3 Right, b32 IsPerspective)
 {
     camera Result = {};
 
-    // TODO: Use in shadow map in playstate?
-
-    Result.AspectRatio = AspectRatio;
-    Result.Near = Near;
-    Result.Far = Far;
-    Result.Fov = DegreeToRadians(Fov);
-    
+    Result.IsPerspective = IsPerspective;
     Result.Pos = Pos;
     Result.View = View;
     Result.Up = Up;
@@ -29,11 +23,11 @@ inline camera CameraCreate_(v3 Pos, v3 View, v3 Up, v3 Right, f32 AspectRatio, f
     return Result;
 }
 
-inline camera CameraFpsCreate(v3 Pos, v3 View, f32 AspectRatio, f32 Near, f32 Far, f32 Fov, f32 TurningVelocity, f32 Velocity)
+inline camera CameraFpsCreate(v3 Pos, v3 View, b32 IsPerspective, f32 TurningVelocity, f32 Velocity)
 {
     // NOTE: https://github.com/Erkaman/gl-movable-camera
     v3 Up = V3(0, 1, 0);
-    camera Result = CameraCreate_(Pos, View, Up, Normalize(Cross(Up, View)), AspectRatio, Near, Far, Fov);
+    camera Result = CameraCreate_(Pos, View, Up, Normalize(Cross(Up, View)), IsPerspective);
 
     Result.Type = CameraType_Fps;
     Result.Fps.TurningVelocity = TurningVelocity;
@@ -42,26 +36,52 @@ inline camera CameraFpsCreate(v3 Pos, v3 View, f32 AspectRatio, f32 Near, f32 Fa
     return Result;
 }
 
-inline camera CameraTopDownCreate(v3 Pos, f32 Angle, f32 AspectRatio, f32 Near, f32 Far, f32 Fov, f32 MoveVelocity, f32 ZoomVelocity)
+inline camera CameraTopDownCreate(v3 Pos, f32 Angle, b32 IsPerspective, f32 MoveVelocity, f32 ZoomVelocity)
 {
     q4 Orientation = Q4AxisAngle(V3(1, 0, 0), Angle);
-
     v3 View = RotateVec(V3(0, 0, 1), Orientation);
     v3 Up = RotateVec(V3(0, 1, 0), Orientation);
     v3 Right = RotateVec(V3(1, 0, 0), Orientation);
     
-    camera Result = CameraCreate_(Pos, View, Up, Right, AspectRatio, Near, Far, Fov);
-
+    camera Result = CameraCreate_(Pos, View, Up, Right, IsPerspective);
+    
     Result.Type = CameraType_TopDown;
+    Result.TopDown.Angle = Angle;
     Result.TopDown.MoveVelocity = MoveVelocity;
     Result.TopDown.ZoomVelocity = ZoomVelocity;
 
     return Result;
 }
 
+inline void CameraSetPersp(camera* Camera, f32 AspectRatio, f32 Fov, f32 Near, f32 Far)
+{
+    Camera->PerspNear = Near;
+    Camera->PerspFar = Far;
+    Camera->PerspAspectRatio = AspectRatio;
+    Camera->PerspFov = DegreeToRadians(Fov);
+}
+
+inline void CameraSetOrtho(camera* Camera, f32 Left, f32 Right, f32 Top, f32 Bottom, f32 Near, f32 Far)
+{
+    Camera->OrthoNear = Near;
+    Camera->OrthoFar = Far;
+    Camera->OrthoLeft = Left;
+    Camera->OrthoRight = Right;
+    Camera->OrthoTop = Top;
+    Camera->OrthoBottom = Bottom;
+}
+
 inline m4 CameraGetP(camera* Camera)
 {
-    m4 Result = VkPerspProjM4(Camera->AspectRatio, Camera->Fov, Camera->Near, Camera->Far);
+    m4 Result = {};
+    if (Camera->IsPerspective)
+    {
+        Result = VkPerspProjM4(Camera->PerspAspectRatio, Camera->PerspFov, Camera->PerspNear, Camera->PerspFar);
+    }
+    else
+    {
+        Result = VkOrthoProjM4(Camera->OrthoLeft, Camera->OrthoRight, Camera->OrthoTop, Camera->OrthoBottom, Camera->OrthoNear, Camera->OrthoFar);
+    }
     return Result;
 }
 
@@ -151,6 +171,12 @@ inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* Pr
 
         case CameraType_TopDown:
         {
+            // NOTE: Setup camera angle
+            q4 Orientation = Q4AxisAngle(V3(1, 0, 0), Camera->TopDown.Angle);
+            Camera->View = RotateVec(V3(0, 0, 1), Orientation);
+            Camera->Up = RotateVec(V3(0, 1, 0), Orientation);
+            Camera->Right = RotateVec(V3(1, 0, 0), Orientation);
+            
             // NOTE: Apply camera translation
             b32 MoveForward = CurrInput->KeysDown['W'];
             b32 MoveLeft = CurrInput->KeysDown['A'];
