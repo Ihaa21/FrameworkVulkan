@@ -877,17 +877,19 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
 
     // NOTE: Init descriptor pool
     {
-        VkDescriptorPoolSize Pools[5] = {};
+        VkDescriptorPoolSize Pools[6] = {};
         Pools[0].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         Pools[0].descriptorCount = 1000;
         Pools[1].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         Pools[1].descriptorCount = 1000;
         Pools[2].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         Pools[2].descriptorCount = 1000;
-        Pools[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
+        Pools[3].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
         Pools[3].descriptorCount = 1000;
-        Pools[4].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+        Pools[4].type = VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER;
         Pools[4].descriptorCount = 1000;
+        Pools[5].type = VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
+        Pools[5].descriptorCount = 1000;
             
         VkDescriptorPoolCreateInfo CreateInfo = {};
         CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
