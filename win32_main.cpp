@@ -287,7 +287,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
                 CurrInput.MousePixelPos.y = ClientRect.bottom - CurrInput.MousePixelPos.y;
                 
                 CurrInput.MouseNormalizedPos.x = f32(CurrInput.MousePixelPos.x) / (f32)(ClientRect.right - ClientRect.left);
-                CurrInput.MouseNormalizedPos.y = f32(CurrInput.MousePixelPos.y) / (f32)(ClientRect.top - ClientRect.bottom);
+                CurrInput.MouseNormalizedPos.y = f32(CurrInput.MousePixelPos.y) / (f32)(ClientRect.bottom - ClientRect.top);
                 
                 CurrInput.MouseDown = (GetKeyState(VK_LBUTTON) & 0x80) != 0;
 
