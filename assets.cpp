@@ -37,7 +37,7 @@ internal vk_image TextureLoad(char* ImagePath, VkFormat Format, u32 ComponentSiz
                            VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     // TODO: Better barrier here pls
-    u8* GpuMemory = VkTransferPushWriteImage(&RenderState->TransferManager, Result.Image, Width, Height, ComponentSize*NumComponents, 
+    u8* GpuMemory = VkCommandsPushWriteImage(&RenderState->Commands, Result.Image, Width, Height, ComponentSize*NumComponents, 
                                              VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                                              BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                              BarrierMask(VK_ACCESS_SHADER_READ_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT));
@@ -105,7 +105,7 @@ inline procedural_mesh AssetsPushQuad()
         Result.Vertices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                          sizeof(Vertices));
-        void* GpuMemory = VkTransferPushWrite(&RenderState->TransferManager, Result.Vertices, sizeof(Vertices),
+        void* GpuMemory = VkCommandsPushWrite(&RenderState->Commands, Result.Vertices, sizeof(Vertices),
                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                               BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
         Copy(Vertices, GpuMemory, sizeof(Vertices));
@@ -122,7 +122,7 @@ inline procedural_mesh AssetsPushQuad()
         Result.Indices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                         sizeof(Indices));
-        void* GpuMemory = VkTransferPushWrite(&RenderState->TransferManager, Result.Indices, sizeof(Indices),
+        void* GpuMemory = VkCommandsPushWrite(&RenderState->Commands, Result.Indices, sizeof(Indices),
                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                               BarrierMask(VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
         Copy(Indices, GpuMemory, sizeof(Indices));
@@ -179,7 +179,7 @@ inline procedural_mesh AssetsPushCube()
         Result.Vertices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                          sizeof(Vertices));
-        void* GpuMemory = VkTransferPushWrite(&RenderState->TransferManager, Result.Vertices, sizeof(Vertices),
+        void* GpuMemory = VkCommandsPushWrite(&RenderState->Commands, Result.Vertices, sizeof(Vertices),
                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                               BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
         Copy(Vertices, GpuMemory, sizeof(Vertices));
@@ -217,7 +217,7 @@ inline procedural_mesh AssetsPushCube()
         Result.Indices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                         VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                         sizeof(Indices));
-        void* GpuMemory = VkTransferPushWrite(&RenderState->TransferManager, Result.Indices, sizeof(Indices),
+        void* GpuMemory = VkCommandsPushWrite(&RenderState->Commands, Result.Indices, sizeof(Indices),
                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                               BarrierMask(VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
         Copy(Indices, GpuMemory, sizeof(Indices));
@@ -235,7 +235,7 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
     // NOTE: https://github.com/JoeyDeVries/LearnOpenGL/blob/master/src/6.pbr/1.1.lighting/lighting.cpp
     Result.Vertices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VerticesSize);
-    f32* Vertices = (f32*)VkTransferPushWrite(&RenderState->TransferManager, Result.Vertices, VerticesSize,
+    f32* Vertices = (f32*)VkCommandsPushWrite(&RenderState->Commands, Result.Vertices, VerticesSize,
                                               BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                               BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
 
@@ -268,7 +268,7 @@ inline procedural_mesh AssetsPushSphere(i32 NumXSegments, i32 NumYSegments)
     Result.Indices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                     VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                     Result.NumIndices*sizeof(u32));
-    u32* Indices = VkTransferPushWriteArray(&RenderState->TransferManager, Result.Indices, u32, Result.NumIndices,
+    u32* Indices = VkCommandsPushWriteArray(&RenderState->Commands, Result.Indices, u32, Result.NumIndices,
                                             BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                             BarrierMask(VK_ACCESS_INDEX_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
 
@@ -362,13 +362,13 @@ internal procedural_mesh AssetsPushModel(char* ModelPath)
     {
         Result.Vertices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                          sizeof(vertex)*TotalNumVertices);
-        Vertices = VkTransferPushWriteArray(&RenderState->TransferManager, Result.Vertices, vertex, TotalNumVertices,
+        Vertices = VkCommandsPushWriteArray(&RenderState->Commands, Result.Vertices, vertex, TotalNumVertices,
                                             BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                             BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
 
         Result.Indices = VkBufferCreate(RenderState->Device, &RenderState->GpuArena, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                         sizeof(u32)*Result.NumIndices);
-        Indices = VkTransferPushWriteArray(&RenderState->TransferManager, Result.Indices, u32, Result.NumIndices,
+        Indices = VkCommandsPushWriteArray(&RenderState->Commands, Result.Indices, u32, Result.NumIndices,
                                            BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                            BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
     }

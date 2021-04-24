@@ -121,7 +121,7 @@ inline void RenderTargetUpdateEntries(linear_arena* TempArena, render_target* Re
     EndTempMem(TempMem);
 }
 
-inline void RenderTargetPassBegin(render_target* RenderTarget, vk_commands Commands, u32 Flags)
+inline void RenderTargetPassBegin(render_target* RenderTarget, vk_commands* Commands, u32 Flags)
 {
     VkRenderPassBeginInfo BeginInfo = {};
     BeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -131,7 +131,7 @@ inline void RenderTargetPassBegin(render_target* RenderTarget, vk_commands Comma
     BeginInfo.renderArea.extent = { RenderTarget->Width, RenderTarget->Height };
     BeginInfo.clearValueCount = RenderTarget->NumEntries;
     BeginInfo.pClearValues = RenderTarget->ClearValues;
-    vkCmdBeginRenderPass(Commands.Buffer, &BeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(Commands->Buffer, &BeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     if (Flags & RenderTargetRenderPass_SetViewPort)
     {
@@ -143,7 +143,7 @@ inline void RenderTargetPassBegin(render_target* RenderTarget, vk_commands Comma
         // TODO: How do we want to handle min/max depth?
         ViewPort.minDepth = 0.0f;
         ViewPort.maxDepth = 1.0f;
-        vkCmdSetViewport(Commands.Buffer, 0, 1, &ViewPort);
+        vkCmdSetViewport(Commands->Buffer, 0, 1, &ViewPort);
     }
     
     if (Flags & RenderTargetRenderPass_SetScissor)
@@ -151,18 +151,18 @@ inline void RenderTargetPassBegin(render_target* RenderTarget, vk_commands Comma
         VkRect2D Scissor = {};
         Scissor.offset = {};
         Scissor.extent = { RenderTarget->Width, RenderTarget->Height };
-        vkCmdSetScissor(Commands.Buffer, 0, 1, &Scissor);
+        vkCmdSetScissor(Commands->Buffer, 0, 1, &Scissor);
     }
 }
 
-inline void RenderTargetNextSubPass(vk_commands Commands)
+inline void RenderTargetNextSubPass(vk_commands* Commands)
 {
-    vkCmdNextSubpass(Commands.Buffer, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdNextSubpass(Commands->Buffer, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-inline void RenderTargetPassEnd(vk_commands Commands)
+inline void RenderTargetPassEnd(vk_commands* Commands)
 {
-    vkCmdEndRenderPass(Commands.Buffer);
+    vkCmdEndRenderPass(Commands->Buffer);
 }
 
 //
@@ -268,13 +268,13 @@ inline vk_pipeline* FullScreenResolveDepthCreate(VkRenderPass RenderPass, u32 Su
     return Result;
 }
 
-inline void FullScreenPassRender(vk_commands Commands, vk_pipeline* Pipeline, u32 NumDescriptors, VkDescriptorSet* Descriptors)
+inline void FullScreenPassRender(vk_commands* Commands, vk_pipeline* Pipeline, u32 NumDescriptors, VkDescriptorSet* Descriptors)
 {
-    vkCmdBindPipeline(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Handle);
-    vkCmdBindDescriptorSets(Commands.Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Layout, 0, NumDescriptors, Descriptors, 0, 0);
+    vkCmdBindPipeline(Commands->Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Handle);
+    vkCmdBindDescriptorSets(Commands->Buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, Pipeline->Layout, 0, NumDescriptors, Descriptors, 0, 0);
     VkDeviceSize Offset = 0;
-    vkCmdBindVertexBuffers(Commands.Buffer, 0, 1, &RenderState->FullScreenVbo, &Offset);
-    vkCmdDraw(Commands.Buffer, 6, 1, 0, 0);
+    vkCmdBindVertexBuffers(Commands->Buffer, 0, 1, &RenderState->FullScreenVbo, &Offset);
+    vkCmdDraw(Commands->Buffer, 6, 1, 0, 0);
 }
 
 //
@@ -824,6 +824,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
     {
         u64 CpuMemSize = MegaBytes(50);
         RenderState->CpuArena = LinearSubArena(Arena, CpuMemSize);
+        RenderState->CpuBlockArena = PlatformBlockArenaCreate(MegaBytes(4), 16);
     }
     
     // NOTE: Allocate host memory
@@ -835,16 +836,11 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
     
     // NOTE: Allocate GPU memory
     {
-        u64 HeapSize = GigaBytes(1);
-        RenderState->GpuArena = VkLinearArenaCreate(RenderState->Device, RenderState->LocalMemoryId, HeapSize);
+        RenderState->GpuArena = VkLinearArenaCreate(RenderState->Device, RenderState->LocalMemoryId, InitParams.GpuLocalSize);
     }
 
     // NOTE: Create Managers
-    RenderState->BarrierManager = VkBarrierManagerCreate(&RenderState->CpuArena, 1000);
     RenderState->DescriptorManager = VkDescriptorManagerCreate(&RenderState->CpuArena, 500);
-    RenderState->TransferManager = VkTransferManagerCreate(RenderState->Device, RenderState->StagingMemoryId, &RenderState->CpuArena,
-                                                          &RenderState->GpuArena, u32(RenderState->DeviceLimits.nonCoherentAtomSize),
-                                                          InitParams.StagingBufferSize, 100, 100);
     RenderState->PipelineManager = VkPipelineManagerCreate(&RenderState->CpuArena);
     
     // NOTE: Init memory for swap chain images
@@ -865,7 +861,8 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
         CmdPoolCreateInfo.queueFamilyIndex = RenderState->GraphicsQueueFamId;
         VkCheckResult(vkCreateCommandPool(RenderState->Device, &CmdPoolCreateInfo, 0, &RenderState->CommandPool));
 
-        RenderState->Commands = VkCommandsCreate(RenderState->Device, RenderState->CommandPool);
+        RenderState->Commands = VkCommandsCreate(RenderState->Device, RenderState->CommandPool, &RenderState->CpuBlockArena,
+                                                 u32(RenderState->DeviceLimits.nonCoherentAtomSize), RenderState->StagingMemoryId);
 
         VkSemaphoreCreateInfo SemaphoreCreateInfo = {};
         SemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -925,7 +922,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
 
     // NOTE: Upload render state specific assets
     {
-        VkCommandsBegin(RenderState->Device, RenderState->Commands);
+        VkCommandsBegin(&RenderState->Commands, RenderState->Device);
 
         // NOTE: Full Screen Data
         {
@@ -943,7 +940,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                                                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                                        sizeof(Vertices));
 
-            f32* Data = VkTransferPushWriteArray(&RenderState->TransferManager, RenderState->FullScreenVbo, f32, ArrayCount(Vertices),
+            f32* Data = VkCommandsPushWriteArray(&RenderState->Commands, RenderState->FullScreenVbo, f32, ArrayCount(Vertices),
                                                  BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                                  BarrierMask(VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT));
             Copy(Vertices, Data, sizeof(Vertices));
@@ -955,7 +952,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
             RenderState->GlobalCubeMapData = VkBufferCreate(RenderState->Device, &RenderState->GpuArena,
                                                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                                             EntrySize*6);
-            u8* Data = VkTransferPushWrite(&RenderState->TransferManager, RenderState->GlobalCubeMapData, EntrySize*6,
+            u8* Data = VkCommandsPushWrite(&RenderState->Commands, RenderState->GlobalCubeMapData, EntrySize*6,
                                            BarrierMask(VkAccessFlagBits(0), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT),
                                            BarrierMask(VK_ACCESS_UNIFORM_READ_BIT, VK_PIPELINE_STAGE_VERTEX_SHADER_BIT));
 
@@ -984,8 +981,7 @@ inline void VkInit(HMODULE VulkanLib, HINSTANCE hInstance, HWND WindowHandle, li
                                     VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, RenderState->GlobalCubeMapData);
         }
         
-        VkTransferManagerFlush(&RenderState->TransferManager, RenderState->Device, RenderState->Commands.Buffer, &RenderState->BarrierManager);
-        VkCommandsSubmit(RenderState->GraphicsQueue, RenderState->Commands);
+        VkCommandsSubmit(&RenderState->Commands, RenderState->Device, RenderState->GraphicsQueue);
     }
     
     EndTempMem(TempMem);

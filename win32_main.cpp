@@ -11,6 +11,10 @@
 #include "platform.h"
 #include "win32_main.h"
 
+#ifndef FRAMEWORK_MEMORY_SIZE
+#define FRAMEWORK_MEMORY_SIZE MegaBytes(100)
+#endif
+
 global prog_state GlobalState;
 
 inline LARGE_INTEGER Win32GetClock()
@@ -136,7 +140,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
     {
         LPVOID BaseAddress = (LPVOID)TeraBytes(2);
         
-        GlobalState.ProgramMemorySize = MegaBytes(100);    
+        GlobalState.ProgramMemorySize = FRAMEWORK_MEMORY_SIZE;
         GlobalState.ProgramMemory = VirtualAlloc(BaseAddress, GlobalState.ProgramMemorySize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
         if (!GlobalState.ProgramMemory)
         {

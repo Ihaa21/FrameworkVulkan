@@ -194,8 +194,6 @@ struct render_init_params
     u32 WindowWidth;
     u32 WindowHeight;
     VkPresentModeKHR PresentMode;
-    
-    u32 StagingBufferSize;
 
     u32 InstanceExtensionCount;
     const char** InstanceExtensions;
@@ -206,6 +204,8 @@ struct render_init_params
     u32 DeviceExtensionCount;
     const char** DeviceExtensions;
 
+    u32 GpuLocalSize;
+    
     // NOTE: Features to enable
     VkPhysicalDeviceFeatures EnableFeatures;
     VkPhysicalDeviceFeatures DisableFeatures;
@@ -243,14 +243,13 @@ struct render_state
     u32 StagingMemoryId;
     u32 LocalMemoryId;
     linear_arena CpuArena;
+    platform_block_arena CpuBlockArena;
     vk_linear_arena HostArena;
     u32* HostPtr;
     vk_linear_arena GpuArena;
     
     // NOTE: Global Managers
-    vk_barrier_manager BarrierManager;
     vk_descriptor_manager DescriptorManager;
-    vk_transfer_manager TransferManager;
     vk_pipeline_manager PipelineManager;
 
     // NOTE: Command Buffer data
