@@ -53,6 +53,25 @@ inline camera CameraTopDownCreate(v3 Pos, f32 Angle, b32 IsPerspective, f32 Move
     return Result;
 }
 
+inline camera CameraFlatCreate(v3 Pos, f32 Radius, f32 MoveVelocity, f32 ZoomVelocity, f32 Near, f32 Far)
+{
+    v3 View = V3(0, 0, 1);
+    v3 Up = V3(0, 1, 0);
+    v3 Right = V3(1, 0, 0);
+    
+    camera Result = CameraCreate_(Pos, View, Up, Right, false);
+    
+    Result.Type = CameraType_Flat;
+    Result.Flat.MoveVelocity = MoveVelocity;
+    Result.Flat.ZoomVelocity = ZoomVelocity;
+
+    f32 OrthoRadiusX = Radius;
+    f32 OrthoRadiusY = OrthoRadiusX / RenderState->WindowAspectRatio;
+    CameraSetOrtho(&Result, -OrthoRadiusX, OrthoRadiusX, OrthoRadiusY, -OrthoRadiusY, Near, Far);
+
+    return Result;
+}
+
 inline void CameraSetPersp(camera* Camera, f32 AspectRatio, f32 Fov, f32 Near, f32 Far)
 {
     Camera->PerspNear = Near;
@@ -102,8 +121,9 @@ inline m4 CameraGetVP(camera* Camera)
     return Result;
 }
 
-inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* PrevInput)
+inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* PrevInput, f32 FrameTime)
 {
+    // TODO: Add frame time mul to all these vels
     // NOTE: Apply camera rotation
     switch (Camera->Type)
     {
@@ -204,6 +224,51 @@ inline void CameraUpdate(camera* Camera, frame_input* CurrInput, frame_input* Pr
             }
     
             Camera->Pos += MoveVel;
+        } break;
+
+        case CameraType_Flat:
+        {
+            // NOTE: Apply camera zoom
+            f32 ZoomChange = -CurrInput->MouseScroll * Camera->Flat.ZoomVelocity * FrameTime;
+            
+            if (ZoomChange != 0.0f)
+            {
+                f32 OrthoRadiusX = Camera->OrthoRight + ZoomChange;
+                f32 OrthoRadiusY = OrthoRadiusX / RenderState->WindowAspectRatio;
+
+                Camera->OrthoLeft = -OrthoRadiusX;
+                Camera->OrthoRight = OrthoRadiusX;
+                Camera->OrthoTop = OrthoRadiusY;
+                Camera->OrthoBottom = -OrthoRadiusY;
+            }
+            
+            // NOTE: Apply camera translation
+            b32 MoveUp = CurrInput->KeysDown['W'];
+            b32 MoveLeft = CurrInput->KeysDown['A'];
+            b32 MoveDown = CurrInput->KeysDown['S'];
+            b32 MoveRight = CurrInput->KeysDown['D'];
+            
+            f32 Velocity = Camera->Flat.MoveVelocity;
+            v3 MoveVel = {};
+            if (MoveUp)
+            {
+                MoveVel += Velocity*V3(0, 1, 0);
+            }
+            if (MoveDown)
+            {
+                MoveVel -= Velocity*V3(0, 1, 0);
+            }
+
+            if (MoveRight)
+            {
+                MoveVel += Velocity*V3(1, 0, 0);
+            }
+            if (MoveLeft)
+            {
+                MoveVel -= Velocity*V3(1, 0, 0);
+            }
+    
+            Camera->Pos += MoveVel * FrameTime;
         } break;
     }
 

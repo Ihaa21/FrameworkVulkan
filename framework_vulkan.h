@@ -11,8 +11,6 @@
 
 #include "platform.h"
 
-//#include "ui\ui.h"
-
 #include "render.h"
 #include "render.cpp"
 

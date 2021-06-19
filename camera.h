@@ -27,6 +27,7 @@ enum camera_type
 
     CameraType_Fps,
     CameraType_TopDown,
+    CameraType_Flat,
 };
 
 struct fps_camera
@@ -39,6 +40,12 @@ struct fps_camera
 struct top_down_camera
 {
     f32 Angle;
+    f32 MoveVelocity;
+    f32 ZoomVelocity;
+};
+
+struct flat_camera
+{
     f32 MoveVelocity;
     f32 ZoomVelocity;
 };
@@ -69,6 +76,7 @@ struct camera
     {
         fps_camera Fps;
         top_down_camera TopDown;
+        flat_camera Flat;
     };
 
     VkBuffer GpuBuffer;
@@ -78,3 +86,5 @@ struct camera_input
 {
     v3 CameraPos;
 };
+
+inline void CameraSetOrtho(camera* Camera, f32 Left, f32 Right, f32 Top, f32 Bottom, f32 Near, f32 Far);

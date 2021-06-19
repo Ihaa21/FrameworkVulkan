@@ -233,6 +233,7 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         // NOTE: Process inputs
         {
             PrevInput = CurrInput;
+            CurrInput.MouseScroll = 0.0f;
 
             // NOTE: Reload demo code DLL if the DLL changed
             FILETIME NewDLLFileTime = Win32GetLastFileTime(GlobalState.DemoCode.SourceDLLPath);
@@ -250,6 +251,11 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
                     case WM_QUIT:
                     {
                         GlobalState.GameIsRunning = false;
+                    } break;
+
+                    case WM_MOUSEWHEEL:
+                    {
+                        CurrInput.MouseScroll += GET_WHEEL_DELTA_WPARAM(Message.wParam);
                     } break;
 
                     case WM_SYSKEYDOWN:
